@@ -38,6 +38,19 @@ class LibraryRepository @Inject constructor(
         }
 
     /**
+     * 高级搜索与过滤查询
+     */
+    fun searchAndFilter(
+        query: String?,
+        status: String?,
+        isFavorite: Boolean?,
+        sortBy: String = "RECENT_READ"
+    ): Flow<List<LibraryItem>> =
+        libraryItemDao.searchAndFilter(query, status, isFavorite, sortBy).map { entities ->
+            entities.map { it.toModel() }
+        }
+
+    /**
      * 按标题搜索条目。
      */
     fun searchByTitle(query: String): Flow<List<LibraryItem>> =

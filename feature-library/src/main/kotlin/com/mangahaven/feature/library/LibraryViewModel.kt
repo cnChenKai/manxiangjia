@@ -15,19 +15,55 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class LibraryViewModel @Inject constructor(
     private val libraryRepository: LibraryRepository,
     private val safImporter: SafImporter,
 ) : ViewModel() {
 
-    // 观察全部漫画
-    val allItems: StateFlow<List<LibraryItem>> = libraryRepository.observeAllItems()
-        .stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000),
-            initialValue = emptyList()
+    // Filter states
+    val searchQuery = MutableStateFlow("")
+    val statusFilter = MutableStateFlow<String?>(null) // null = all, UNREAD, READING, COMPLETED
+    val isFavoriteFilter = MutableStateFlow<Boolean?>(null)
+    val sortBy = MutableStateFlow("RECENT_READ")
+
+    // 观察过滤后的全部漫画
+    val allItems: StateFlow<List<LibraryItem>> = combine(
+        searchQuery,
+        statusFilter,
+        isFavoriteFilter,
+        sortBy
+    ) { query, status, isFavorite, sort ->
+        FilterParams(
+            query = query.takeIf { it.isNotBlank() },
+            status = status,
+            isFavorite = isFavorite,
+            sortBy = sort
         )
+    }.flatMapLatest { params ->
+        libraryRepository.searchAndFilter(
+            query = params.query,
+            status = params.status,
+            isFavorite = params.isFavorite,
+            sortBy = params.sortBy
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5000),
+        initialValue = emptyList()
+    )
+
+    private data class FilterParams(
+        val query: String?,
+        val status: String?,
+        val isFavorite: Boolean?,
+        val sortBy: String
+    )
 
     // 观察最近阅读
     val recentItems: StateFlow<List<LibraryItem>> = libraryRepository.observeRecentlyRead(10)
@@ -53,6 +89,18 @@ class LibraryViewModel @Inject constructor(
             _isImporting.value = true
             safImporter.importDirectory(uri)
             _isImporting.value = false
+        }
+    }
+
+    fun toggleFavorite(item: LibraryItem) {
+        viewModelScope.launch {
+            libraryRepository.updateItem(item.copy(isFavorite = !item.isFavorite))
+        }
+    }
+
+    fun updateReadingStatus(item: LibraryItem, status: com.mangahaven.model.ReadingStatus) {
+        viewModelScope.launch {
+            libraryRepository.updateItem(item.copy(readingStatus = status))
         }
     }
 }

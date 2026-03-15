@@ -30,6 +30,24 @@ interface LibraryItemDao {
     @Query("SELECT * FROM library_items WHERE readingStatus = :status ORDER BY updatedAt DESC")
     fun observeByStatus(status: String): Flow<List<LibraryItemEntity>>
 
+    @Query("""
+        SELECT * FROM library_items 
+        WHERE (:query IS NULL OR title LIKE '%' || :query || '%')
+        AND (:status IS NULL OR readingStatus = :status)
+        AND (:isFavorite IS NULL OR isFavorite = :isFavorite)
+        ORDER BY 
+            CASE WHEN :sortBy = 'RECENT_READ' THEN lastReadAt END DESC,
+            CASE WHEN :sortBy = 'RECENT_ADDED' THEN createdAt END DESC,
+            CASE WHEN :sortBy = 'TITLE' THEN title END ASC,
+            updatedAt DESC
+    """)
+    fun searchAndFilter(
+        query: String?,
+        status: String?,
+        isFavorite: Boolean?,
+        sortBy: String
+    ): Flow<List<LibraryItemEntity>>
+
     @Query("SELECT * FROM library_items WHERE title LIKE '%' || :query || '%' ORDER BY title ASC")
     fun searchByTitle(query: String): Flow<List<LibraryItemEntity>>
 

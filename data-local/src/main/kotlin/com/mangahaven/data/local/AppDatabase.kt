@@ -21,7 +21,7 @@ import com.mangahaven.data.local.entity.SourceEntity
         ReadingProgressEntity::class,
         ItemSettingsEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

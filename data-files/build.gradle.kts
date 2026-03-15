@@ -46,6 +46,11 @@ dependencies {
     // Logging
     implementation(libs.timber)
 
+    // WorkManager & Job Scheduling
+    implementation(libs.workmanager)
+    implementation(libs.hilt.work)
+    ksp(libs.hilt.compiler)
+
     // Testing
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)

@@ -15,6 +15,7 @@ data class LibraryItem(
     val itemType: LibraryItemType,
     val pageCount: Int? = null,
     val readingStatus: ReadingStatus = ReadingStatus.UNREAD,
+    val isFavorite: Boolean = false,
     val lastReadAt: Long? = null,
     val createdAt: Long,
     val updatedAt: Long,

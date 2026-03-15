@@ -1,14 +1,27 @@
 package com.mangahaven.app
 
 import android.app.Application
+import androidx.hilt.work.HiltWorkerFactory
+import androidx.work.*
+import com.mangahaven.data.files.worker.LibrarySyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import java.util.concurrent.TimeUnit
+import javax.inject.Inject
 
 /**
  * MangaHaven Application 入口。
  */
 @HiltAndroidApp
-class MangaHavenApplication : Application() {
+class MangaHavenApplication : Application(), Configuration.Provider {
+
+    @Inject
+    lateinit var workerFactory: HiltWorkerFactory
+
+    override val workManagerConfiguration: Configuration
+        get() = Configuration.Builder()
+            .setWorkerFactory(workerFactory)
+            .build()
 
     override fun onCreate() {
         super.onCreate()
@@ -16,5 +29,24 @@ class MangaHavenApplication : Application() {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+
+        scheduleBackgroundSync()
+    }
+
+    private fun scheduleBackgroundSync() {
+        // 配置环境约束：网络畅通时才同步
+        val constraints = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
+
+        val syncRequest = PeriodicWorkRequestBuilder<LibrarySyncWorker>(12, TimeUnit.HOURS)
+            .setConstraints(constraints)
+            .build()
+
+        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
+            "LibrarySyncWork",
+            ExistingPeriodicWorkPolicy.KEEP,
+            syncRequest
+        )
     }
 }

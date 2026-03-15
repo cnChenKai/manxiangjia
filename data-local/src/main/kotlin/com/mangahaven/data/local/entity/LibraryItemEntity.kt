@@ -23,6 +23,7 @@ import androidx.room.PrimaryKey
         Index("title"),
         Index("lastReadAt"),
         Index("updatedAt"),
+        Index("isFavorite"),
     ],
 )
 data class LibraryItemEntity(
@@ -35,6 +36,7 @@ data class LibraryItemEntity(
     val itemType: String,
     val pageCount: Int? = null,
     val readingStatus: String = "UNREAD",
+    val isFavorite: Boolean = false,
     val lastReadAt: Long? = null,
     val createdAt: Long,
     val updatedAt: Long,

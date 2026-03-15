@@ -20,6 +20,9 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -35,6 +38,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mangahaven.model.LibraryItem
 import com.mangahaven.model.LibraryItemType
+import com.mangahaven.model.ReadingStatus
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -49,6 +53,9 @@ fun LibraryScreen(
     val allItems by viewModel.allItems.collectAsStateWithLifecycle()
     val recentItems by viewModel.recentItems.collectAsStateWithLifecycle()
     val isImporting by viewModel.isImporting.collectAsStateWithLifecycle()
+    val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
+    val statusFilter by viewModel.statusFilter.collectAsStateWithLifecycle()
+    val isFavoriteFilter by viewModel.isFavoriteFilter.collectAsStateWithLifecycle()
 
     var showImportMenu by remember { mutableStateOf(false) }
 
@@ -71,11 +78,11 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text("漫享家 / MangaHaven") },
                 actions = {
+                    IconButton(onClick = { viewModel.sortBy.value = if (viewModel.sortBy.value == "TITLE") "RECENT_READ" else "TITLE" }) {
+                        Icon(Icons.Default.Settings, contentDescription = "排序")
+                    }
                     IconButton(onClick = onNavigateToSources) {
                         Icon(Icons.Default.CloudQueue, contentDescription = "远程源")
-                    }
-                    IconButton(onClick = { /* TODO: Search */ }) {
-                        Icon(Icons.Default.Search, contentDescription = "搜索")
                     }
                     IconButton(onClick = onNavigateToSettings) {
                         Icon(Icons.Default.Settings, contentDescription = "设置")
@@ -122,29 +129,78 @@ fun LibraryScreen(
                 .fillMaxSize()
                 .padding(paddingValues)
         ) {
-            val isEmpty = allItems.isEmpty()
+            val isEmpty = allItems.isEmpty() && searchQuery.isBlank()
 
-            if (isEmpty) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Search & Filter Header
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { viewModel.searchQuery.value = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp),
+                    placeholder = { Text("搜索书名...") },
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+                    singleLine = true,
+                    shape = RoundedCornerShape(100)
+                )
+
+                LazyRow(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text(
-                        text = "书架空空如也",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "点击右下角按钮导入本地目录或压缩包",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp)
-                    )
+                    item {
+                        FilterChip(
+                            selected = isFavoriteFilter == true,
+                            onClick = { viewModel.isFavoriteFilter.value = if (isFavoriteFilter == true) null else true },
+                            label = { Text("收藏") },
+                            leadingIcon = { if (isFavoriteFilter == true) Icon(Icons.Default.Star, null, Modifier.size(18.dp)) }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == ReadingStatus.UNREAD.name,
+                            onClick = { viewModel.statusFilter.value = if (statusFilter == ReadingStatus.UNREAD.name) null else ReadingStatus.UNREAD.name },
+                            label = { Text("未读") }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == ReadingStatus.READING.name,
+                            onClick = { viewModel.statusFilter.value = if (statusFilter == ReadingStatus.READING.name) null else ReadingStatus.READING.name },
+                            label = { Text("阅读中") }
+                        )
+                    }
+                    item {
+                        FilterChip(
+                            selected = statusFilter == ReadingStatus.COMPLETED.name,
+                            onClick = { viewModel.statusFilter.value = if (statusFilter == ReadingStatus.COMPLETED.name) null else ReadingStatus.COMPLETED.name },
+                            label = { Text("已读") }
+                        )
+                    }
                 }
-            } else {
+
+                if (isEmpty) {
+                    Column(
+                        modifier = Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            text = "书架空空如也",
+                            style = MaterialTheme.typography.headlineSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "点击右下角按钮导入本地目录或网络挂载源",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp)
+                        )
+                    }
+                } else {
                 LazyVerticalGrid(
                     columns = GridCells.Adaptive(110.dp),
                     contentPadding = PaddingValues(16.dp),
@@ -168,7 +224,8 @@ fun LibraryScreen(
                                 items(recentItems, key = { it.id }) { item ->
                                     RecentReadItem(
                                         item = item,
-                                        onClick = { onNavigateToReader(item.id) }
+                                        onClick = { onNavigateToReader(item.id) },
+                                        onToggleFavorite = { viewModel.toggleFavorite(item) }
                                     )
                                 }
                             }
@@ -180,7 +237,7 @@ fun LibraryScreen(
 
                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(this.maxLineSpan) }) {
                         Text(
-                            text = "全部漫画",
+                            text = "过滤结果",
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
@@ -189,10 +246,13 @@ fun LibraryScreen(
                     items(allItems, key = { it.id }) { item ->
                         LibraryGridItem(
                             item = item,
-                            onClick = { onNavigateToReader(item.id) }
+                            onClick = { onNavigateToReader(item.id) },
+                            onToggleFavorite = { viewModel.toggleFavorite(item) },
+                            onUpdateStatus = { viewModel.updateReadingStatus(item, it) }
                         )
                     }
                 }
+            }
             }
 
             if (isImporting) {
@@ -210,7 +270,7 @@ fun LibraryScreen(
 }
 
 @Composable
-private fun RecentReadItem(item: LibraryItem, onClick: () -> Unit) {
+private fun RecentReadItem(item: LibraryItem, onClick: () -> Unit, onToggleFavorite: () -> Unit) {
     Card(
         modifier = Modifier
             .width(200.dp)
@@ -234,6 +294,9 @@ private fun RecentReadItem(item: LibraryItem, onClick: () -> Unit) {
                         modifier = Modifier.fillMaxSize()
                     )
                 }
+                if (item.isFavorite) {
+                    Icon(Icons.Default.Star, "收藏", modifier = Modifier.padding(4.dp).size(16.dp), tint = Color.Yellow)
+                }
             }
             Column(
                 modifier = Modifier
@@ -256,19 +319,32 @@ private fun RecentReadItem(item: LibraryItem, onClick: () -> Unit) {
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
-                // Progress could go here
-                Text(
-                    text = "${item.pageCount ?: "?"} 页",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${item.pageCount ?: "?"} 页",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onToggleFavorite, modifier = Modifier.size(24.dp)) {
+                        Icon(if (item.isFavorite) Icons.Default.Star else Icons.Default.StarBorder, "收藏", modifier = Modifier.size(16.dp))
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-private fun LibraryGridItem(modifier: Modifier = Modifier, item: LibraryItem, onClick: () -> Unit) {
+private fun LibraryGridItem(
+    modifier: Modifier = Modifier, 
+    item: LibraryItem, 
+    onClick: () -> Unit,
+    onToggleFavorite: () -> Unit,
+    onUpdateStatus: (ReadingStatus) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
     Column(
         modifier = modifier
             .width(110.dp)
@@ -298,6 +374,36 @@ private fun LibraryGridItem(modifier: Modifier = Modifier, item: LibraryItem, on
                     modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(2.dp)
                 ) {
                     Icon(Icons.Default.Cloud, contentDescription = "云端", modifier = Modifier.size(12.dp), tint = Color.White)
+                }
+            }
+            if (item.isFavorite) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopStart).padding(4.dp).background(Color.Black.copy(alpha = 0.4f), RoundedCornerShape(4.dp)).padding(2.dp)
+                ) {
+                    Icon(Icons.Default.Star, "收藏", modifier = Modifier.size(12.dp), tint = Color.Yellow)
+                }
+            }
+
+            Box(modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
+                IconButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier.size(24.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                ) {
+                    Icon(Icons.Default.MoreVert, "更多菜单", tint = Color.White, modifier = Modifier.size(16.dp))
+                }
+                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text(if (item.isFavorite) "取消收藏" else "加入收藏") },
+                        onClick = { onToggleFavorite(); expanded = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("标记为已读") },
+                        onClick = { onUpdateStatus(ReadingStatus.COMPLETED); expanded = false }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("标记为未读") },
+                        onClick = { onUpdateStatus(ReadingStatus.UNREAD); expanded = false }
+                    )
                 }
             }
         }
