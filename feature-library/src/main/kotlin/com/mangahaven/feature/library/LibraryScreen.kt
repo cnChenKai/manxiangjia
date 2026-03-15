@@ -18,6 +18,8 @@ import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.CloudQueue
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -32,6 +34,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mangahaven.model.LibraryItem
+import com.mangahaven.model.LibraryItemType
 import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -39,6 +42,7 @@ import java.io.File
 fun LibraryScreen(
     onNavigateToReader: (String) -> Unit,
     onNavigateToSettings: () -> Unit,
+    onNavigateToSources: () -> Unit,
     viewModel: LibraryViewModel = hiltViewModel()
 ) {
     val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior(rememberTopAppBarState())
@@ -67,6 +71,9 @@ fun LibraryScreen(
             TopAppBar(
                 title = { Text("漫享家 / MangaHaven") },
                 actions = {
+                    IconButton(onClick = onNavigateToSources) {
+                        Icon(Icons.Default.CloudQueue, contentDescription = "远程源")
+                    }
                     IconButton(onClick = { /* TODO: Search */ }) {
                         Icon(Icons.Default.Search, contentDescription = "搜索")
                     }
@@ -240,6 +247,14 @@ private fun RecentReadItem(item: LibraryItem, onClick: () -> Unit) {
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
+                if (item.itemType == LibraryItemType.REMOTE_ENTRY) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Cloud, contentDescription = "云端", modifier = Modifier.size(16.dp), tint = MaterialTheme.colorScheme.primary)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("远程串流", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                    }
+                }
                 Spacer(modifier = Modifier.height(8.dp))
                 // Progress could go here
                 Text(
@@ -277,6 +292,13 @@ private fun LibraryGridItem(modifier: Modifier = Modifier, item: LibraryItem, on
                 )
             } else {
                 Text("暂无封面", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.labelSmall)
+            }
+            if (item.itemType == LibraryItemType.REMOTE_ENTRY) {
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd).padding(4.dp).background(Color.Black.copy(alpha = 0.6f), RoundedCornerShape(4.dp)).padding(2.dp)
+                ) {
+                    Icon(Icons.Default.Cloud, contentDescription = "云端", modifier = Modifier.size(12.dp), tint = Color.White)
+                }
             }
         }
         Spacer(modifier = Modifier.height(8.dp))

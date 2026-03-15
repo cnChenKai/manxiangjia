@@ -9,6 +9,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mangahaven.feature.library.LibraryScreen
+import com.mangahaven.feature.library.browser.RemoteBrowserScreen
+import com.mangahaven.feature.library.source.SourceListScreen
 import com.mangahaven.feature.reader.ReaderScreen
 import com.mangahaven.feature.settings.SettingsScreen
 
@@ -72,6 +74,9 @@ fun AppNavigation() {
                 onNavigateToSettings = {
                     navController.navigate(AppRoutes.SETTINGS)
                 },
+                onNavigateToSources = {
+                    navController.navigate(AppRoutes.SOURCES)
+                }
             )
         }
 
@@ -97,6 +102,33 @@ fun AppNavigation() {
                 onNavigateBack = {
                     navController.popBackStack()
                 },
+            )
+        }
+
+        // 源管理页
+        composable(AppRoutes.SOURCES) {
+            SourceListScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                },
+                onNavigateToBrowser = { sourceId ->
+                    navController.navigate(AppRoutes.browserRoute(sourceId))
+                }
+            )
+        }
+
+        // 远程目录浏览页
+        composable(
+            route = AppRoutes.BROWSER,
+            arguments = listOf(
+                navArgument("sourceId") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val sourceId = backStackEntry.arguments?.getString("sourceId") ?: return@composable
+            RemoteBrowserScreen(
+                onNavigateBack = {
+                    navController.popBackStack()
+                }
             )
         }
     }

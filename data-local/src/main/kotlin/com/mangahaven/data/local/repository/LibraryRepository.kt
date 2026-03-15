@@ -98,4 +98,19 @@ class LibraryRepository @Inject constructor(
      */
     suspend fun getSource(id: String): Source? =
         sourceDao.getById(id)?.toModel()
+
+    /**
+     * 观察全部内容源
+     */
+    fun observeAllSources(): Flow<List<Source>> =
+        sourceDao.observeAll().map { entities -> 
+            entities.map { it.toModel() }
+        }
+
+    /**
+     * 删除内容源
+     */
+    suspend fun removeSource(id: String) {
+        sourceDao.deleteById(id)
+    }
 }
