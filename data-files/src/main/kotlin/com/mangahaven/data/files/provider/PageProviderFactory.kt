@@ -1,8 +1,13 @@
 package com.mangahaven.data.files.provider
 
 import android.content.Context
+import com.mangahaven.data.files.container.RemoteFolderContainerReader
+import com.mangahaven.data.files.remote.SourceClientFactory
+import com.mangahaven.data.local.dao.SourceDao
+import com.mangahaven.data.local.mapper.toModel
 import com.mangahaven.model.ContainerTarget
 import com.mangahaven.model.LibraryItemType
+import com.mangahaven.model.SourceType
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -13,16 +18,28 @@ import javax.inject.Singleton
 @Singleton
 class PageProviderFactory @Inject constructor(
     private val context: Context,
+    private val sourceDao: SourceDao,
+    private val sourceClientFactory: SourceClientFactory,
 ) {
     /**
      * 为指定条目创建 PageProvider。
      */
-    fun create(itemId: String, path: String, itemType: LibraryItemType): LocalPageProvider {
+    suspend fun create(itemId: String, sourceId: String, path: String, itemType: LibraryItemType): com.mangahaven.data.files.PageProvider {
         val target = ContainerTarget(
-            sourceId = "local",
+            sourceId = sourceId,
             path = path,
             itemType = itemType,
         )
-        return LocalPageProvider(context, target)
+
+        val sourceEntity = sourceDao.getById(sourceId)
+        val source = sourceEntity?.toModel()
+        
+        return if (source != null && (source.type == SourceType.WEBDAV || source.type == SourceType.SMB)) {
+            val client = sourceClientFactory.create(source)
+            val reader = RemoteFolderContainerReader(client)
+            RemotePageProvider(target, reader)
+        } else {
+            LocalPageProvider(context, target)
+        }
     }
 }

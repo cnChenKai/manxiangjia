@@ -71,6 +71,7 @@ class ReaderViewModel @Inject constructor(
             // 建立文件读取 Provider
             val provider = pageProviderFactory.create(
                 itemId = item.id,
+                sourceId = item.sourceId,
                 path = item.path,
                 itemType = item.itemType
             )

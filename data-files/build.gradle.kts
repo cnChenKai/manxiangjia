@@ -31,6 +31,10 @@ dependencies {
     // AndroidX
     implementation(libs.documentfile)
 
+    // Network & SMB
+    implementation(libs.okhttp)
+    implementation(libs.jcifs.ng)
+
     // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
