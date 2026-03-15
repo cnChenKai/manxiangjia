@@ -27,7 +27,7 @@ class FileScanner(
     private val context: Context,
 ) {
     companion object {
-        private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz")
+        private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz", "rar", "cbr")
     }
 
     /**

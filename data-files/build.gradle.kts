@@ -31,9 +31,10 @@ dependencies {
     // AndroidX
     implementation(libs.documentfile)
 
-    // Network & SMB
+    // Network & SMB & Archive
     implementation(libs.okhttp)
     implementation(libs.jcifs.ng)
+    implementation(libs.junrar)
 
     // Hilt
     implementation(libs.hilt.android)

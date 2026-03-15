@@ -12,6 +12,7 @@ data class ReaderSettings(
     val enablePreload: Boolean = true,
     val doublePageMode: Boolean = false,
     val keepScreenOn: Boolean = true,
+    val volumeKeysPaging: Boolean = true,
     val tapZoneProfile: TapZoneProfile = TapZoneProfile.DEFAULT,
 )
 
@@ -36,5 +37,6 @@ data class ItemReaderSettingsOverride(
     val readingMode: ReadingMode? = null,
     val cropEnabled: Boolean? = null,
     val doublePageMode: Boolean? = null,
+    val volumeKeysPaging: Boolean? = null,
     val pageOffset: Int? = null,
 )

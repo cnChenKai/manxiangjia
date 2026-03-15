@@ -11,12 +11,20 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mangahaven.model.ReadingMode
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    viewModel: SettingsViewModel = hiltViewModel()
 ) {
+    val privacyLockEnabled by viewModel.privacyLockEnabled.collectAsStateWithLifecycle()
+    val readerSettings by viewModel.readerSettings.collectAsStateWithLifecycle()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -40,36 +48,43 @@ fun SettingsScreen(
         ) {
             SettingsCategoryTitle(title = "通用设置")
             SettingsSwitchItem(
+                title = "应用隐私锁",
+                subtitle = "从后台返回时要求验证指纹或密码",
+                checked = privacyLockEnabled,
+                onCheckedChange = viewModel::togglePrivacyLock
+            )
+            SettingsSwitchItem(
                 title = "保持屏幕常亮",
-                subtitle = "阅读时不息屏",
-                checked = true,
-                onCheckedChange = { /* TODO */ }
+                subtitle = "阅读时不息屏 (全局预设)",
+                checked = readerSettings.keepScreenOn,
+                onCheckedChange = viewModel::toggleKeepScreenOn
             )
             HorizontalDivider()
             
             SettingsCategoryTitle(title = "默认阅读选项")
+            val readingModeLabel = if (readerSettings.readingMode == ReadingMode.LEFT_TO_RIGHT) "从左到右" else "从右到左"
             SettingsClickableItem(
                 title = "默认阅读方向",
-                subtitle = "从左到右",
-                onClick = { /* TODO */ }
+                subtitle = readingModeLabel,
+                onClick = viewModel::updateReadingMode
             )
             SettingsSwitchItem(
                 title = "双页模式",
                 subtitle = "横屏时自动将两页拼合",
-                checked = false,
-                onCheckedChange = { /* TODO */ }
+                checked = readerSettings.doublePageMode,
+                onCheckedChange = viewModel::toggleDoublePageMode
             )
             SettingsSwitchItem(
                 title = "白边裁切",
                 subtitle = "自动检测并裁切图片白边",
-                checked = false,
-                onCheckedChange = { /* TODO */ }
+                checked = readerSettings.enableCrop,
+                onCheckedChange = viewModel::toggleCropEnabled
             )
             SettingsSwitchItem(
                 title = "相邻页预加载",
                 subtitle = "提前加载前后的图片，翻页更流畅",
-                checked = true,
-                onCheckedChange = { /* TODO */ }
+                checked = readerSettings.enablePreload,
+                onCheckedChange = viewModel::togglePreload
             )
             HorizontalDivider()
 

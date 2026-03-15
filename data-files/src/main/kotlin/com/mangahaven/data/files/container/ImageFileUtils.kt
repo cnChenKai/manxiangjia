@@ -46,6 +46,14 @@ object ImageFileUtils {
     }
 
     /**
+     * 判断是否为归档压缩包文件。
+     */
+    fun isArchive(name: String): Boolean {
+        val extension = name.substringAfterLast('.', "").lowercase()
+        return extension in setOf("zip", "cbz", "rar", "cbr")
+    }
+
+    /**
      * 自然排序比较器。
      * 支持文件名中数字的自然排序（如 page2.jpg < page10.jpg）。
      */

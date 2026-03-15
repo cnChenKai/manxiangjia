@@ -25,6 +25,12 @@ class LocalPageProvider(
     private var pages: List<PageRef>? = null
     private val folderReader by lazy { FolderContainerReader(context) }
     private val archiveReader by lazy { ArchiveContainerReader(context) }
+    private val rarReader by lazy { com.mangahaven.data.files.container.RarArchiveContainerReader(context) }
+
+    private fun isRarArchive(path: String): Boolean {
+        val lowerPath = path.lowercase()
+        return lowerPath.endsWith(".rar") || lowerPath.endsWith(".cbr")
+    }
 
     /**
      * 初始化页面列表（懒加载）。
@@ -33,7 +39,13 @@ class LocalPageProvider(
         return pages ?: run {
             val loadedPages = when (containerTarget.itemType) {
                 LibraryItemType.FOLDER -> folderReader.listPages(containerTarget)
-                LibraryItemType.ARCHIVE -> archiveReader.listPages(containerTarget)
+                LibraryItemType.ARCHIVE -> {
+                    if (isRarArchive(containerTarget.path)) {
+                        rarReader.listPages(containerTarget)
+                    } else {
+                        archiveReader.listPages(containerTarget)
+                    }
+                }
                 else -> emptyList()
             }
             pages = loadedPages
@@ -55,7 +67,11 @@ class LocalPageProvider(
                 LibraryItemType.FOLDER -> folderReader.openPage(pageRef)
                 LibraryItemType.ARCHIVE -> {
                     val archiveUri = Uri.parse(containerTarget.path)
-                    archiveReader.openPageFromArchive(archiveUri, pageRef.path)
+                    if (isRarArchive(containerTarget.path)) {
+                        rarReader.openPageFromArchive(archiveUri, pageRef.path)
+                    } else {
+                        archiveReader.openPageFromArchive(archiveUri, pageRef.path)
+                    }
                 }
                 else -> throw IllegalStateException("Unsupported item type: ${containerTarget.itemType}")
             }

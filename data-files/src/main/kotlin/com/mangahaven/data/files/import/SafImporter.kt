@@ -161,7 +161,14 @@ class SafImporter @Inject constructor(
 
         val coverStream = when (scanResult.itemType) {
             LibraryItemType.FOLDER -> FolderContainerReader(context).extractCover(target)
-            LibraryItemType.ARCHIVE -> ArchiveContainerReader(context).extractCover(target)
+            LibraryItemType.ARCHIVE -> {
+                val lowerPath = target.path.lowercase()
+                if (lowerPath.endsWith(".rar") || lowerPath.endsWith(".cbr")) {
+                    com.mangahaven.data.files.container.RarArchiveContainerReader(context).extractCover(target)
+                } else {
+                    ArchiveContainerReader(context).extractCover(target)
+                }
+            }
             else -> null
         }
 

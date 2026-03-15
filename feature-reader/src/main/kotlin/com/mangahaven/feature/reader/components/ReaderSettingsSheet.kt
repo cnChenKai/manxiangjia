@@ -19,6 +19,7 @@ fun ReaderSettingsSheet(
     onReadingModeChange: (ReadingMode, Boolean) -> Unit,
     onCropChange: (Boolean, Boolean) -> Unit,
     onDoublePageChange: (Boolean, Boolean) -> Unit,
+    onVolumeKeysChange: (Boolean, Boolean) -> Unit,
     onPageOffsetChange: (Int) -> Unit,
     onResetToGlobal: () -> Unit
 ) {
@@ -107,6 +108,19 @@ fun ReaderSettingsSheet(
                 Switch(
                     checked = settings.doublePageMode,
                     onCheckedChange = { onDoublePageChange(it, applyToAll) }
+                )
+            }
+
+            // 音量键与手柄翻页
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("实体按键翻页 (音量键/手柄)")
+                Switch(
+                    checked = settings.volumeKeysPaging,
+                    onCheckedChange = { onVolumeKeysChange(it, applyToAll) }
                 )
             }
 

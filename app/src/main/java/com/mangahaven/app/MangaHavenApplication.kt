@@ -30,8 +30,13 @@ class MangaHavenApplication : Application(), Configuration.Provider {
             Timber.plant(Timber.DebugTree())
         }
 
+        androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
+
         scheduleBackgroundSync()
     }
+
+    @Inject
+    lateinit var appLockManager: AppLockManager
 
     private fun scheduleBackgroundSync() {
         // 配置环境约束：网络畅通时才同步

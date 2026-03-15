@@ -65,6 +65,7 @@ class ItemSettingsRepository @Inject constructor(
                 doublePageMode = override?.doublePageMode ?: global.doublePageMode,
                 pageOffset = override?.pageOffset ?: 0,
                 keepScreenOn = global.keepScreenOn,
+                volumeKeysPaging = override?.volumeKeysPaging ?: global.volumeKeysPaging,
                 enablePreload = global.enablePreload,
                 isOverridden = override != null,
             )
@@ -81,6 +82,7 @@ class ItemSettingsRepository @Inject constructor(
             },
             cropEnabled = cropEnabled,
             doublePageMode = doublePageMode,
+            volumeKeysPaging = volumeKeysPaging,
             pageOffset = pageOffset,
         )
     }
@@ -91,6 +93,7 @@ class ItemSettingsRepository @Inject constructor(
             readingMode = readingMode?.name,
             cropEnabled = cropEnabled,
             doublePageMode = doublePageMode,
+            volumeKeysPaging = volumeKeysPaging,
             pageOffset = pageOffset,
         )
     }
@@ -103,6 +106,7 @@ data class ResolvedReaderSettings(
     val readingMode: ReadingMode,
     val enableCrop: Boolean,
     val doublePageMode: Boolean,
+    val volumeKeysPaging: Boolean,
     val pageOffset: Int,
     val keepScreenOn: Boolean,
     val enablePreload: Boolean,

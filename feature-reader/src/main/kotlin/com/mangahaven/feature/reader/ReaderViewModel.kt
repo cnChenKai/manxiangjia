@@ -169,6 +169,18 @@ class ReaderViewModel @Inject constructor(
         }
     }
 
+    fun toggleVolumeKeysPaging(enabled: Boolean, saveAsGlobal: Boolean) {
+        viewModelScope.launch {
+            if (saveAsGlobal) {
+                val current = settingsDataStore.settingsFlow.first()
+                settingsDataStore.updateSettings(current.copy(volumeKeysPaging = enabled))
+                removeOverrideIfAny()
+            } else {
+                saveOrUpdateOverride { it.copy(volumeKeysPaging = enabled) }
+            }
+        }
+    }
+
     fun updatePageOffset(offset: Int) {
         // 页码偏移只能是局部设置
         viewModelScope.launch { saveOrUpdateOverride { it.copy(pageOffset = offset) } }

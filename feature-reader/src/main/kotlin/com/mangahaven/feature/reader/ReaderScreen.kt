@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.input.key.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
@@ -42,6 +45,12 @@ fun ReaderScreen(
     var overlayVisible by remember { mutableStateOf(false) }
     var showSettingsSheet by remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
+    val focusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        // 请求焦点以接收按键事件
+        focusRequester.requestFocus()
+    }
 
     if (uiState.isLoading || settings == null) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
@@ -93,6 +102,43 @@ fun ReaderScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
+            .focusRequester(focusRequester)
+            .focusable()
+            .onKeyEvent { event ->
+                if (!settings.volumeKeysPaging) return@onKeyEvent false
+
+                // 统一处理按下和抬起，防止系统二次处理
+                val isDown = event.type == KeyEventType.KeyDown
+                val isUp = event.type == KeyEventType.KeyUp
+
+                if (isDown) {
+                    when (event.key) {
+                        Key.VolumeDown, Key.DirectionDown, Key.DirectionRight, Key.PageDown, Key.Spacebar -> {
+                            coroutineScope.launch {
+                                val nextPage = (pagerState.currentPage + 1).coerceAtMost(sheetsCount - 1)
+                                pagerState.animateScrollToPage(nextPage)
+                            }
+                            true
+                        }
+                        Key.VolumeUp, Key.DirectionUp, Key.DirectionLeft, Key.PageUp -> {
+                            coroutineScope.launch {
+                                val prevPage = (pagerState.currentPage - 1).coerceAtLeast(0)
+                                pagerState.animateScrollToPage(prevPage)
+                            }
+                            true
+                        }
+                        else -> false
+                    }
+                } else if (isUp) {
+                    when (event.key) {
+                        Key.VolumeDown, Key.DirectionDown, Key.DirectionRight, Key.PageDown, Key.Spacebar,
+                        Key.VolumeUp, Key.DirectionUp, Key.DirectionLeft, Key.PageUp -> true
+                        else -> false
+                    }
+                } else {
+                    false
+                }
+            }
     ) {
         if (uiState.totalPages > 0) {
             val modifier = Modifier
@@ -240,6 +286,7 @@ fun ReaderScreen(
         onReadingModeChange = viewModel::updateReadingMode,
         onCropChange = viewModel::toggleCrop,
         onDoublePageChange = viewModel::toggleDoublePage,
+        onVolumeKeysChange = viewModel::toggleVolumeKeysPaging,
         onPageOffsetChange = viewModel::updatePageOffset,
         onResetToGlobal = viewModel::resetToGlobalSettings
     )

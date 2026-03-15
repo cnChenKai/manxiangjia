@@ -32,6 +32,7 @@ class SettingsDataStore @Inject constructor(
         val ENABLE_PRELOAD = booleanPreferencesKey("enable_preload")
         val DOUBLE_PAGE_MODE = booleanPreferencesKey("double_page_mode")
         val KEEP_SCREEN_ON = booleanPreferencesKey("keep_screen_on")
+        val VOLUME_KEYS_PAGING = booleanPreferencesKey("volume_keys_paging")
         val TAP_ZONE_PROFILE = stringPreferencesKey("tap_zone_profile")
     }
 
@@ -47,6 +48,7 @@ class SettingsDataStore @Inject constructor(
             enablePreload = prefs[Keys.ENABLE_PRELOAD] ?: true,
             doublePageMode = prefs[Keys.DOUBLE_PAGE_MODE] ?: false,
             keepScreenOn = prefs[Keys.KEEP_SCREEN_ON] ?: true,
+            volumeKeysPaging = prefs[Keys.VOLUME_KEYS_PAGING] ?: true,
             tapZoneProfile = prefs[Keys.TAP_ZONE_PROFILE]?.let {
                 runCatching { TapZoneProfile.valueOf(it) }.getOrNull()
             } ?: TapZoneProfile.DEFAULT,
@@ -63,6 +65,7 @@ class SettingsDataStore @Inject constructor(
             prefs[Keys.ENABLE_PRELOAD] = settings.enablePreload
             prefs[Keys.DOUBLE_PAGE_MODE] = settings.doublePageMode
             prefs[Keys.KEEP_SCREEN_ON] = settings.keepScreenOn
+            prefs[Keys.VOLUME_KEYS_PAGING] = settings.volumeKeysPaging
             prefs[Keys.TAP_ZONE_PROFILE] = settings.tapZoneProfile.name
         }
     }

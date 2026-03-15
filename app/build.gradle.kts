@@ -72,7 +72,9 @@ dependencies {
     implementation(libs.navigation.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
+    implementation(libs.lifecycle.process)
     implementation(libs.core.ktx)
+    implementation(libs.androidx.biometric)
 
     // Hilt
     implementation(libs.hilt.android)
