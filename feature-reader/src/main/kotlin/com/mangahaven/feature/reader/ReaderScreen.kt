@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -23,6 +24,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mangahaven.feature.reader.components.ReaderSettingsSheet
+import com.mangahaven.feature.reader.components.ThumbnailStrip
+import com.mangahaven.model.ReadingMode
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,11 +37,13 @@ fun ReaderScreen(
     viewModel: ReaderViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsStateWithLifecycle()
-    
-    // 沉浸界面的可见性
-    var overlayVisible by remember { mutableStateOf(false) }
+    val settings = uiState.settings
 
-    if (uiState.isLoading) {
+    var overlayVisible by remember { mutableStateOf(false) }
+    var showSettingsSheet by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+
+    if (uiState.isLoading || settings == null) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
             CircularProgressIndicator(color = Color.White)
         }
@@ -44,56 +51,88 @@ fun ReaderScreen(
     }
 
     val totalPages = uiState.totalPages.coerceAtLeast(1)
-    val startIndex = uiState.currentPage.coerceIn(0, totalPages - 1)
-    
-    val pagerState = rememberPagerState(
-        initialPage = startIndex,
-        pageCount = { totalPages }
-    )
-
-    // 同步翻页进度到 ViewModel
-    LaunchedEffect(pagerState.currentPage) {
-        viewModel.onPageChanged(pagerState.currentPage)
+    // 简单计算：如果双页且非垂直模式（通常垂直模式不双页），页数大致减半。细节处理如封面单跨这里简化为全双拼
+    val sheetsCount = if (settings.doublePageMode && settings.readingMode != ReadingMode.VERTICAL) {
+        (totalPages + 1) / 2
+    } else {
+        totalPages
     }
 
-    // 主阅读器背景 (暗色或纯黑增加沉浸感)
+    // 将逻辑页转换为实际源文件索引数组
+    val getSourceIndicesForSheet: (Int) -> List<Int> = { sheetIndex ->
+        if (settings.doublePageMode && settings.readingMode != ReadingMode.VERTICAL) {
+            val baseIndex = sheetIndex * 2 + settings.pageOffset
+            val p1 = baseIndex.coerceIn(0, totalPages - 1)
+            val p2 = (baseIndex + 1).coerceIn(0, totalPages - 1)
+            if (p1 == p2) listOf(p1) else listOf(p1, p2)
+        } else {
+            listOf((sheetIndex + settings.pageOffset).coerceIn(0, totalPages - 1))
+        }
+    }
+
+    val startIndex = if (settings.doublePageMode && settings.readingMode != ReadingMode.VERTICAL) {
+        uiState.currentPage / 2
+    } else {
+        uiState.currentPage
+    }.coerceIn(0, (sheetsCount - 1).coerceAtLeast(0))
+
+    val pagerState = rememberPagerState(
+        initialPage = startIndex,
+        pageCount = { sheetsCount }
+    )
+
+    // 反向同步 Pager to ViewModel
+    LaunchedEffect(pagerState.currentPage) {
+        val indices = getSourceIndicesForSheet(pagerState.currentPage)
+        // 使用该展示面包含的第一个索引作为当前进度保存
+        viewModel.onPageChanged(indices.firstOrNull() ?: 0)
+    }
+
+    // 主阅读器背景
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
     ) {
         if (uiState.totalPages > 0) {
-            HorizontalPager(
-                state = pagerState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null
-                    ) {
-                        // 点击屏幕唤出/隐藏菜单
-                        overlayVisible = !overlayVisible
+            val modifier = Modifier
+                .fillMaxSize()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    overlayVisible = !overlayVisible
+                }
+
+            when (settings.readingMode) {
+                ReadingMode.LEFT_TO_RIGHT -> {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = modifier,
+                        reverseLayout = false
+                    ) { sheet ->
+                        ReaderPageContent(uiState, settings, getSourceIndicesForSheet(sheet))
                     }
-            ) { page ->
-                // Page Content
-                val imageBitmap = rememberPageImage(pageProvider = uiState.pageProvider, index = page)
-                
-                if (imageBitmap != null) {
-                    Image(
-                        bitmap = imageBitmap,
-                        contentDescription = "Page $page",
-                        modifier = Modifier.fillMaxSize(),
-                        // 这里默认 Fit，后续可加入手势缩放模块
-                        contentScale = ContentScale.Fit
-                    )
-                } else {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = Color.DarkGray)
+                }
+                ReadingMode.RIGHT_TO_LEFT -> {
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = modifier,
+                        reverseLayout = true // 反向布局完美实现右向左阅读
+                    ) { sheet ->
+                        ReaderPageContent(uiState, settings, getSourceIndicesForSheet(sheet))
+                    }
+                }
+                ReadingMode.VERTICAL -> {
+                    VerticalPager(
+                        state = pagerState,
+                        modifier = modifier
+                    ) { sheet ->
+                        ReaderPageContent(uiState, settings, getSourceIndicesForSheet(sheet))
                     }
                 }
             }
         } else {
-            // Empty State
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text("暂无漫画内容", color = Color.White)
             }
@@ -108,27 +147,16 @@ fun ReaderScreen(
         ) {
             TopAppBar(
                 title = {
-                    Column {
-                        Text(
-                            text = uiState.book?.title ?: "未知漫画",
-                            style = MaterialTheme.typography.titleMedium,
-                            maxLines = 1,
-                            color = Color.White
-                        )
-                    }
+                    Text(
+                        text = uiState.book?.title ?: "未知漫画",
+                        style = MaterialTheme.typography.titleMedium,
+                        maxLines = 1,
+                        color = Color.White
+                    )
                 },
                 navigationIcon = {
                     IconButton(onClick = onNavigateBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回",
-                            tint = Color.White
-                        )
-                    }
-                },
-                actions = {
-                    IconButton(onClick = { /* TODO: Top actions */ }) {
-                        Icon(Icons.Default.MoreVert, contentDescription = "更多", tint = Color.White)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回", tint = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(
@@ -148,43 +176,108 @@ fun ReaderScreen(
                 color = Color.Black.copy(alpha = 0.8f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    // 页码和进度条
+                Column {
+                    // 缩略图条 (由 ViewModel 提供的 generator 生成缩略图)
+                    ThumbnailStrip(
+                        itemId = uiState.book?.id ?: "",
+                        totalPages = uiState.totalPages,
+                        currentPage = uiState.currentPage,
+                        thumbnailGenerator = viewModel.thumbnailGenerator,
+                        pageProvider = uiState.pageProvider,
+                        onPageSelected = { targetPage ->
+                            coroutineScope.launch {
+                                // 这里简化跳页逻辑到对应 sheet
+                                val targetSheet = if (settings.doublePageMode && settings.readingMode != ReadingMode.VERTICAL) {
+                                    targetPage / 2
+                                } else {
+                                    targetPage
+                                }
+                                pagerState.scrollToPage(targetSheet.coerceIn(0, sheetsCount - 1))
+                                viewModel.onPageChanged(targetPage)
+                            }
+                        }
+                    )
+
                     Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text("${pagerState.currentPage + 1}", style = MaterialTheme.typography.bodySmall, color = Color.White)
-                        
-                        // 由于 Pager 的 page 是基于 Slider 控制的，由于 Compose Slider 问题，我们需要对状态转换
+                        Text("${uiState.currentPage + 1}", style = MaterialTheme.typography.bodySmall, color = Color.White)
+                        val slideValue = if (sheetsCount > 1) {
+                            (pagerState.currentPage.toFloat() / (sheetsCount - 1).toFloat()) * (uiState.totalPages - 1)
+                        } else 0f
                         Slider(
-                            value = pagerState.currentPage.toFloat(),
-                            onValueChange = { /* 拖动期间预留动作，如不实时跳转可使用 onValueChangeFinished */ },
-                            onValueChangeFinished = { /* 当手指抬起时同步 pager */ },
+                            value = slideValue,
+                            onValueChange = {},
                             valueRange = 0f..((uiState.totalPages - 1).coerceAtLeast(1).toFloat()),
-                            modifier = Modifier
-                                .weight(1f)
-                                .padding(horizontal = 8.dp),
-                            enabled = false // 目前仅用于展示进度，禁止拖拉直接翻页防止复杂同步问题
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
+                            enabled = false
                         )
                         Text("${uiState.totalPages}", style = MaterialTheme.typography.bodySmall, color = Color.White)
                     }
 
-                    // 底部控制按钮
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly
+                        horizontalArrangement = Arrangement.Center
                     ) {
-                        TextButton(onClick = { /* TODO: Switch Mode */ }) {
+                        TextButton(onClick = { showSettingsSheet = true }) {
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = Color.White)
+                            Spacer(Modifier.width(8.dp))
                             Text("阅读设置", color = Color.White)
-                        }
-                        IconButton(onClick = { /* TODO: Settings */ }) {
-                            Icon(Icons.Default.Settings, contentDescription = "设置", tint = Color.White)
                         }
                     }
                 }
             }
+        }
+    }
+
+    ReaderSettingsSheet(
+        settings = settings,
+        isVisible = showSettingsSheet,
+        onVisibleChange = { showSettingsSheet = it },
+        onReadingModeChange = viewModel::updateReadingMode,
+        onCropChange = viewModel::toggleCrop,
+        onDoublePageChange = viewModel::toggleDoublePage,
+        onPageOffsetChange = viewModel::updatePageOffset,
+        onResetToGlobal = viewModel::resetToGlobalSettings
+    )
+}
+
+@Composable
+private fun ReaderPageContent(
+    uiState: ReaderUiState,
+    settings: ResolvedReaderSettings,
+    indices: List<Int>
+) {
+    if (indices.isEmpty()) return
+
+    val p1 = indices[0]
+    val p2 = if (indices.size > 1) indices[1] else null
+
+    val isDoublePage = p2 != null
+
+    val imageBitmap = rememberPageImage(
+        pageProvider = uiState.pageProvider,
+        index = p1,
+        enableCrop = settings.enableCrop,
+        doublePageMode = isDoublePage,
+        isCover = false,
+        nextIndex = p2
+    )
+
+    if (imageBitmap != null) {
+        Image(
+            bitmap = imageBitmap,
+            // 垂直模式需要占据最大宽度高度支持下拉连续。横向模式自适应缩放
+            contentDescription = "Page(s)",
+            modifier = Modifier.fillMaxSize(),
+            contentScale = if (settings.readingMode == ReadingMode.VERTICAL) ContentScale.FillWidth else ContentScale.Fit
+        )
+    } else {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = Color.DarkGray)
         }
     }
 }
