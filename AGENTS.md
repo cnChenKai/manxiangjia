@@ -3,7 +3,8 @@
 ## Purpose
 
 This repository is an Android project.
-Your job as an agent is to make the project build successfully and produce a Debug APK with minimal, targeted fixes.
+
+Your job as an agent is to restore a healthy Android build with minimal, targeted fixes and to keep working until a Debug APK is actually produced.
 
 Primary goal:
 
@@ -14,20 +15,22 @@ Primary goal:
 5. Prepare a clean PR summary of the changes
 
 Do not stop after fixing the first error.
+Do not stop after fixing only the currently known errors.
 Keep iterating until the Debug APK is produced or a true external blocker is proven.
 
 ---
 
-## Working style
+## How to work in this repository
 
 Use an iterative repair loop:
 
 1. Inspect repository docs and build configuration
-2. Run the relevant Gradle command
-3. Identify the first real blocker
-4. Fix the root cause
-5. Re-run the build
-6. Repeat until the APK is generated
+2. Determine the intended build path and environment
+3. Run the relevant Gradle command
+4. Identify the first real blocker
+5. Fix the root cause
+6. Re-run the build
+7. Repeat until the APK is generated
 
 Prefer minimal changes.
 Fix root causes, not only surface symptoms.
@@ -40,6 +43,24 @@ Do not:
 - add fake stubs, fake repositories, or mock implementations unless the existing architecture clearly requires them
 - delete business logic to bypass failures
 - perform broad refactors unrelated to restoring a healthy build
+
+---
+
+## Plan expectations
+
+Before making changes, inspect the repository and form a plan based on the real build setup.
+
+Your plan should account for:
+
+- repository documentation
+- build configuration
+- Gradle wrapper usage
+- CI workflow behavior
+- the actual APK output path
+- known likely failure areas listed below
+
+After the plan is approved or execution begins, continue directly into the fix/build loop.
+Do not stop after plan creation.
 
 ---
 
@@ -124,6 +145,8 @@ Preferred behavior:
 If CI currently uses a different Gradle invocation and that is part of the failure chain, fix it.
 
 Do not break failure-report uploads while fixing APK uploads.
+
+If the task results in a PR, ensure the branch and workflow changes are consistent with passing CI.
 
 ---
 
