@@ -21,12 +21,12 @@ class RemoteFolderContainerReader(
         entries
             .filter { !it.isDirectory }
             .filter { ImageFileUtils.isImageFile(it.name) }
-            .filter { !ImageFileUtils.isIgnoredEntry(it.name) }
-            .sortedWith { a, b -> ImageFileUtils.naturalCompare(a.name, b.name) }
+            .filter { !ImageFileUtils.shouldIgnore(it.name) }
+            .sortedWith { a, b -> ImageFileUtils.naturalOrderComparator.compare(a.name, b.name) }
             .mapIndexed { index, entry ->
                 PageRef(
                     index = index,
-                    id = entry.path,
+                    path = entry.path,
                     name = entry.name,
                     sizeBytes = entry.sizeBytes ?: 0L,
                 )
@@ -34,8 +34,8 @@ class RemoteFolderContainerReader(
     }
 
     override suspend fun openPage(pageRef: PageRef): InputStream = withContext(Dispatchers.IO) {
-        // pageRef.id 里存了我们能请求的绝对子路径
-        sourceClient.openStream(pageRef.id)
+        // pageRef.path 里存了我们能请求的绝对子路径
+        sourceClient.openStream(pageRef.path)
     }
 
     override suspend fun extractCover(target: ContainerTarget): InputStream? = withContext(Dispatchers.IO) {

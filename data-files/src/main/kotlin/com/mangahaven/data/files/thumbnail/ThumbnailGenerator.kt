@@ -20,7 +20,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class ThumbnailGenerator @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     companion object {
         private const val THUMBNAIL_WIDTH = 150

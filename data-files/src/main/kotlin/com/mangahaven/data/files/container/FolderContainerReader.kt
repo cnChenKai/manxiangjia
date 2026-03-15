@@ -16,7 +16,7 @@ import java.io.InputStream
  * 从 SAF DocumentFile 目录中读取图片文件作为漫画页面。
  */
 class FolderContainerReader(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) : ContainerReader {
 
     override suspend fun listPages(target: ContainerTarget): List<PageRef> =

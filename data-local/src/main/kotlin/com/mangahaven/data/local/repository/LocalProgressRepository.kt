@@ -1,6 +1,6 @@
 package com.mangahaven.data.local.repository
 
-import com.mangahaven.data.files.ProgressRepository
+import com.mangahaven.model.repository.ProgressRepository
 import com.mangahaven.data.local.dao.ReadingProgressDao
 import com.mangahaven.data.local.mapper.toEntity
 import com.mangahaven.data.local.mapper.toModel

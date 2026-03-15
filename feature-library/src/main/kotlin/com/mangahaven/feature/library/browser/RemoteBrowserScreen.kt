@@ -101,7 +101,7 @@ private fun BrowserItem(
         headlineContent = { Text(entry.name) },
         supportingContent = { 
             if (!entry.isDirectory && entry.sizeBytes != null) {
-                Text("${entry.sizeBytes / 1024} KB")
+                Text("${entry.sizeBytes!! / 1024} KB")
             }
         },
         leadingContent = {

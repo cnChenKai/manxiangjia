@@ -36,4 +36,7 @@ data class ItemSettingsEntity(
 
     @ColumnInfo(name = "page_offset")
     val pageOffset: Int? = null,
+
+    @ColumnInfo(name = "volume_keys_paging")
+    val volumeKeysPaging: Boolean? = null,
 )

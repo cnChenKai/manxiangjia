@@ -20,7 +20,7 @@ import java.util.zip.ZipInputStream
  * 不做全量解压，按需读取。
  */
 class ArchiveContainerReader(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) : ContainerReader {
 
     override suspend fun listPages(target: ContainerTarget): List<PageRef> =

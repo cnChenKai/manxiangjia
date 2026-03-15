@@ -17,7 +17,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class PageProviderFactory @Inject constructor(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val sourceDao: SourceDao,
     private val sourceClientFactory: SourceClientFactory,
 ) {

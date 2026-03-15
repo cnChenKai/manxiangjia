@@ -1,4 +1,4 @@
-package com.mangahaven.data.files.`import`
+package com.mangahaven.data.files.importer
 
 import android.content.Context
 import android.net.Uri
@@ -8,6 +8,8 @@ import com.mangahaven.model.LibraryItemType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * 文件扫描结果。
@@ -23,8 +25,10 @@ data class ScanResult(
  * 文件扫描器。
  * 扫描 SAF 目录中的漫画文件和图片，识别 ZIP、CBZ 和图片文件夹。
  */
-class FileScanner(
-    private val context: Context,
+
+@Singleton
+class FileScanner @Inject constructor(
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     companion object {
         private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz", "rar", "cbr")

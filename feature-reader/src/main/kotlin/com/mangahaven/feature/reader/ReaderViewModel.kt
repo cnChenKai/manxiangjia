@@ -4,7 +4,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mangahaven.data.files.PageProvider
-import com.mangahaven.data.files.ProgressRepository
+import com.mangahaven.model.repository.ProgressRepository
 import com.mangahaven.data.files.provider.PageProviderFactory
 import com.mangahaven.data.local.SettingsDataStore
 import com.mangahaven.data.local.repository.ItemSettingsRepository
@@ -45,6 +45,7 @@ class ReaderViewModel @Inject constructor(
                 doublePageMode = false,
                 pageOffset = 0,
                 keepScreenOn = true,
+                volumeKeysPaging = true,
                 enablePreload = true,
                 isOverridden = false
             )

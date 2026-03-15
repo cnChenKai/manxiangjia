@@ -1,4 +1,4 @@
-package com.mangahaven.data.files.`import`
+package com.mangahaven.data.files.importer
 
 import android.content.Context
 import android.content.Intent
@@ -21,7 +21,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class SafImporter @Inject constructor(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val fileScanner: FileScanner,
     private val libraryRepository: LibraryRepository,
     private val coverManager: CoverManager,

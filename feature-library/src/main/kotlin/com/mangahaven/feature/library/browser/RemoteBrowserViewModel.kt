@@ -3,7 +3,7 @@ package com.mangahaven.feature.library.browser
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mangahaven.data.files.`import`.RemoteScanner
+import com.mangahaven.data.files.importer.RemoteScanner
 import com.mangahaven.data.files.remote.SourceClientFactory
 import com.mangahaven.data.local.repository.LibraryRepository
 import com.mangahaven.model.SourceEntry

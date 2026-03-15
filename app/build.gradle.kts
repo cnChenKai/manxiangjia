@@ -7,6 +7,9 @@ plugins {
 }
 
 android {
+    buildFeatures {
+        buildConfig = true
+    }
     namespace = "com.mangahaven.app"
     compileSdk = 35
 
