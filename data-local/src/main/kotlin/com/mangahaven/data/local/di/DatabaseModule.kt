@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.mangahaven.data.local.AppDatabase
 import com.mangahaven.data.local.SettingsDataStore
+import com.mangahaven.data.local.dao.ItemSettingsDao
 import com.mangahaven.data.local.dao.LibraryItemDao
 import com.mangahaven.data.local.dao.ReadingProgressDao
 import com.mangahaven.data.local.dao.SourceDao
@@ -48,6 +49,11 @@ object DatabaseModule {
     @Provides
     fun provideReadingProgressDao(database: AppDatabase): ReadingProgressDao {
         return database.readingProgressDao()
+    }
+
+    @Provides
+    fun provideItemSettingsDao(database: AppDatabase): ItemSettingsDao {
+        return database.itemSettingsDao()
     }
 
     @Provides
