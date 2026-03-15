@@ -26,6 +26,10 @@ android {
 
 dependencies {
     implementation(project(":core-model"))
+    implementation(project(":data-local"))
+
+    // AndroidX
+    implementation(libs.documentfile)
 
     // Hilt
     implementation(libs.hilt.android)
