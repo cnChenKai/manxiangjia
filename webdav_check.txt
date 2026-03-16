@@ -39,7 +39,7 @@ class WebDavSourceClient(
 
     override suspend fun list(path: String): List<SourceEntry> = withContext(Dispatchers.IO) {
         val url = buildUrl(path)
-        
+
         // WebDAV PROPFIND，Depth = 1 查询子目录
         val request = Request.Builder()
             .url(url)
@@ -47,19 +47,19 @@ class WebDavSourceClient(
             .header("Depth", "1")
             .addAuth()
             .build()
-            
+
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) {
                 throw java.io.IOException("WebDAV list failed: ${response.code} ${response.message}")
             }
-            
+
             parsePropfindResponse(response.body?.string() ?: "", path)
         }
     }
 
     override suspend fun stat(path: String): SourceEntry? = withContext(Dispatchers.IO) {
         val url = buildUrl(path)
-        
+
         // WebDAV PROPFIND，Depth = 0 查询自己
         val request = Request.Builder()
             .url(url)
@@ -67,7 +67,7 @@ class WebDavSourceClient(
             .header("Depth", "0")
             .addAuth()
             .build()
-            
+
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw java.io.IOException("WebDAV stat failed: ${response.code} ${response.message}")
             parsePropfindResponse(response.body?.string() ?: "", path).firstOrNull()
@@ -81,13 +81,13 @@ class WebDavSourceClient(
             .get()
             .addAuth()
             .build()
-            
+
         val response = httpClient.newCall(request).execute()
         if (!response.isSuccessful) {
             response.close()
             throw IllegalStateException("Failed to GET WebDAV stream: ${response.code}")
         }
-        
+
         response.body?.byteStream() ?: throw IllegalStateException("Empty WebDAV body")
     }
 
@@ -119,30 +119,30 @@ class WebDavSourceClient(
             factory.isNamespaceAware = true
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(xmlContent.byteInputStream())
-            
+
             val responses: NodeList = doc.getElementsByTagNameNS("*", "response")
-            
+
             for (i in 0 until responses.length) {
                 val responseNode = responses.item(i) as Element
                 val hrefNode = responseNode.getElementsByTagNameNS("*", "href").item(0)
                 val href = hrefNode?.textContent ?: continue
-                
+
                 // 跳过父级自身的返回（当 Depth=1 时，第一个 response 通常是目录自身）
                 val normalizedHref = href.trimEnd('/')
                 val normalizedReq = requestPath.trimEnd('/')
                 if (i == 0 && requestPath.isNotEmpty() && normalizedHref.endsWith(normalizedReq)) {
-                    continue 
+                    continue
                 }
 
                 val propstatNode = responseNode.getElementsByTagNameNS("*", "propstat").item(0) as? Element
                 val propNode = propstatNode?.getElementsByTagNameNS("*", "prop")?.item(0) as? Element
-                
+
                 if (propNode != null) {
                     val isDir = propNode.getElementsByTagNameNS("*", "collection").length > 0
-                    
+
                     val contentLengthNode = propNode.getElementsByTagNameNS("*", "getcontentlength").item(0)
                     val sizeBytes = contentLengthNode?.textContent?.toLongOrNull()
-                    
+
                     val lastModifiedNode = propNode.getElementsByTagNameNS("*", "getlastmodified").item(0)
                     val lastModified = lastModifiedNode?.textContent?.let { dateStr ->
                         try {
@@ -154,7 +154,7 @@ class WebDavSourceClient(
                             null
                         }
                     }
-                    
+
                     val name = normalizedHref.substringAfterLast('/')
                     val decodedName = try {
                         java.net.URLDecoder.decode(name, "UTF-8")
