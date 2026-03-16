@@ -2,38 +2,74 @@ package com.mangahaven.data.files.remote
 
 import com.mangahaven.model.Source
 import com.mangahaven.model.SourceEntry
-import com.mangahaven.model.SourceType
 import kotlinx.coroutines.runBlocking
-import okhttp3.*
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.ResponseBody.Companion.toResponseBody
+import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Before
 import org.junit.Test
 import java.io.IOException
-import org.junit.Assert.assertThrows
 
 class WebDavSourceClientTest {
 
+    private lateinit var mockWebServer: MockWebServer
+    private lateinit var client: WebDavSourceClient
+
+    @Before
+    fun setUp() {
+        mockWebServer = MockWebServer()
+        mockWebServer.start()
+
+        val source = Source(
+            id = "1",
+            name = "Test WebDAV",
+            type = com.mangahaven.model.SourceType.WEBDAV,
+            configJson = mockWebServer.url("/").toString(),
+            authRef = "user:password"
+        )
+
+        client = WebDavSourceClient(source, OkHttpClient())
+    }
+
+    @After
+    fun tearDown() {
+        mockWebServer.shutdown()
+    }
+
     @Test
-    fun testParsePropfindResponse() { runBlocking {
-        val xml = """<?xml version="1.0" encoding="utf-8"?>
+    fun `list root returns expected entries`() = runBlocking {
+        val xmlResponse = """<?xml version="1.0" encoding="utf-8"?>
 <D:multistatus xmlns:D="DAV:">
   <D:response>
-    <D:href>/dav/</D:href>
+    <D:href>/</D:href>
     <D:propstat>
       <D:prop>
-        <D:getlastmodified>Thu, 13 Feb 2025 10:44:48 GMT</D:getlastmodified>
+        <D:getlastmodified>Tue, 10 Sep 2024 12:00:00 GMT</D:getlastmodified>
         <D:resourcetype><D:collection/></D:resourcetype>
       </D:prop>
       <D:status>HTTP/1.1 200 OK</D:status>
     </D:propstat>
   </D:response>
   <D:response>
-    <D:href>/dav/test%20space.txt</D:href>
+    <D:href>/folder1/</D:href>
     <D:propstat>
       <D:prop>
-        <D:getlastmodified>Thu, 13 Feb 2025 10:44:48 GMT</D:getlastmodified>
-        <D:getcontentlength>123</D:getcontentlength>
+        <D:getlastmodified>Tue, 10 Sep 2024 13:00:00 GMT</D:getlastmodified>
+        <D:resourcetype><D:collection/></D:resourcetype>
+      </D:prop>
+      <D:status>HTTP/1.1 200 OK</D:status>
+    </D:propstat>
+  </D:response>
+  <D:response>
+    <D:href>/file.cbz</D:href>
+    <D:propstat>
+      <D:prop>
+        <D:getlastmodified>Wed, 11 Sep 2024 14:00:00 GMT</D:getlastmodified>
+        <D:getcontentlength>1024</D:getcontentlength>
         <D:resourcetype/>
       </D:prop>
       <D:status>HTTP/1.1 200 OK</D:status>
@@ -41,47 +77,67 @@ class WebDavSourceClientTest {
   </D:response>
 </D:multistatus>"""
 
-        val source = Source(id = "1", name = "Test", type = SourceType.WEBDAV, configJson = "http://localhost/dav", authRef = null)
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(207)
+                .setHeader("Content-Type", "application/xml; charset=utf-8")
+                .setBody(xmlResponse)
+        )
 
-        val mockHttpClient = OkHttpClient.Builder().addInterceptor { chain ->
-            Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(207)
-                .message("Multi-Status")
-                .body(xml.toResponseBody("application/xml".toMediaType()))
-                .build()
-        }.build()
+        val entries = client.list("/")
 
-        val client = WebDavSourceClient(source, mockHttpClient)
+        assertEquals(2, entries.size)
+
+        val folder = entries.find { it.name == "folder1" }
+        assertTrue(folder != null)
+        assertTrue(folder!!.isDirectory)
+        assertEquals("/folder1", folder.path)
+
+        val file = entries.find { it.name == "file.cbz" }
+        assertTrue(file != null)
+        assertFalse(file!!.isDirectory)
+        assertEquals(1024L, file.sizeBytes)
+        assertEquals("/file.cbz", file.path)
+
+        val request = mockWebServer.takeRequest()
+        assertEquals("PROPFIND", request.method)
+        assertEquals("1", request.getHeader("Depth"))
+    }
+
+    @Test(expected = IOException::class)
+    fun `list root throws IOException on 401 Unauthorized`() = runBlocking {
+        mockWebServer.enqueue(MockResponse().setResponseCode(401))
+        client.list("/")
+        Unit
+    }
+
+    @Test
+    fun `list root with tricky paths`() = runBlocking {
+        val xmlResponse = """<?xml version="1.0" encoding="utf-8"?>
+<D:multistatus xmlns:D="DAV:">
+  <D:response>
+    <D:href>/my%20folder/</D:href>
+    <D:propstat>
+      <D:prop>
+        <D:getlastmodified>Tue, 10 Sep 2024 12:00:00 GMT</D:getlastmodified>
+        <D:resourcetype><D:collection/></D:resourcetype>
+      </D:prop>
+      <D:status>HTTP/1.1 200 OK</D:status>
+    </D:propstat>
+  </D:response>
+</D:multistatus>"""
+
+        mockWebServer.enqueue(
+            MockResponse()
+                .setResponseCode(207)
+                .setHeader("Content-Type", "application/xml; charset=utf-8")
+                .setBody(xmlResponse)
+        )
+
         val entries = client.list("/")
 
         assertEquals(1, entries.size)
-        assertEquals("test space.txt", entries[0].name)
-        assertEquals(123L, entries[0].sizeBytes)
-        assertEquals(false, entries[0].isDirectory)
-    } }
-
-    @Test
-    fun testErrorResponseThrowsException() { runBlocking {
-        val source = Source(id = "1", name = "Test", type = SourceType.WEBDAV, configJson = "http://localhost/dav", authRef = null)
-
-        val mockHttpClient = OkHttpClient.Builder().addInterceptor { chain ->
-            Response.Builder()
-                .request(chain.request())
-                .protocol(Protocol.HTTP_1_1)
-                .code(401)
-                .message("Unauthorized")
-                .body("".toResponseBody("application/xml".toMediaType()))
-                .build()
-        }.build()
-
-        val client = WebDavSourceClient(source, mockHttpClient)
-
-        assertThrows(IOException::class.java) {
-            runBlocking {
-                client.list("/")
-            }
-        }
-    } }
+        assertEquals("my folder", entries[0].name)
+        assertEquals("/my folder", entries[0].path)
+    }
 }
