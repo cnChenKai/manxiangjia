@@ -105,6 +105,14 @@ class WebDavSourceClient(
 
         try {
             val factory = DocumentBuilderFactory.newInstance()
+            // XXE Security Fix: Disable DTDs and external entities
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
+            factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
+            factory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            factory.isXIncludeAware = false
+            factory.isExpandEntityReferences = false
+
             // 忽略命名空间带来的解析麻烦
             factory.isNamespaceAware = true
             val builder = factory.newDocumentBuilder()
