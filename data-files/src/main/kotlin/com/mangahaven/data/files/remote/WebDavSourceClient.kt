@@ -14,6 +14,8 @@ import org.w3c.dom.Element
 import org.w3c.dom.NodeList
 import timber.log.Timber
 import java.io.InputStream
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
@@ -142,7 +144,16 @@ class WebDavSourceClient(
                     val sizeBytes = contentLengthNode?.textContent?.toLongOrNull()
                     
                     val lastModifiedNode = propNode.getElementsByTagNameNS("*", "getlastmodified").item(0)
-                    // TODO: 解析 HTTP Date 格式作为 lastModified，这里先为空
+                    val lastModified = lastModifiedNode?.textContent?.let { dateStr ->
+                        try {
+                            ZonedDateTime.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME)
+                                .toInstant()
+                                .toEpochMilli()
+                        } catch (e: Exception) {
+                            Timber.e(e, "Failed to parse lastModified date: $dateStr")
+                            null
+                        }
+                    }
                     
                     val name = normalizedHref.substringAfterLast('/')
 
@@ -151,7 +162,8 @@ class WebDavSourceClient(
                             name = java.net.URLDecoder.decode(name, "UTF-8"),
                             path = normalizedHref,
                             isDirectory = isDir,
-                            sizeBytes = sizeBytes
+                            sizeBytes = sizeBytes,
+                            lastModified = lastModified
                         )
                     )
                 }
