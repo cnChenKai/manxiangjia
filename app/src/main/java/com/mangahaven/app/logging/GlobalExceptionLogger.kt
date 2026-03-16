@@ -1,7 +1,7 @@
 package com.mangahaven.app.logging
 
 import timber.log.Timber
-import com.mangahaven.app.logging.CrashUploader
+import com.mangahaven.data.files.remote.CrashUploader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

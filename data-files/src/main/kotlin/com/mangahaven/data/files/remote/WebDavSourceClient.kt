@@ -119,7 +119,7 @@ class WebDavSourceClient(
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(xmlContent.byteInputStream())
             
-            val responses: NodeList = doc.getElementsByTagNameNS("*", "response")
+            val responses: org.w3c.dom.NodeList = doc.getElementsByTagNameNS("*", "response")
             
             for (i in 0 until responses.length) {
                 val responseNode = responses.item(i) as org.w3c.dom.Element
@@ -129,6 +129,7 @@ class WebDavSourceClient(
                 val normalizedHref = href.trimEnd('/')
                 val reqSubPath = requestPath.trimStart('/').trimEnd('/')
 
+                // Skip self. If request is /webdav, and href is /webdav/
                 if (reqSubPath.isNotEmpty() && normalizedHref.endsWith(reqSubPath)) {
                     if (responses.length > 1 && normalizedHref.endsWith(reqSubPath)) continue
                 } else if (reqSubPath.isEmpty() && (normalizedHref.isEmpty() || normalizedHref == "/")) {
@@ -154,30 +155,37 @@ class WebDavSourceClient(
                 }
                 
                 if (propNode != null) {
+                    // Check for collection tag inside resourcetype or anywhere in prop
                     val isDir = propNode.getElementsByTagNameNS("*", "collection").length > 0 || normalizedHref.endsWith("/")
                     
                     val contentLengthNode = propNode.getElementsByTagNameNS("*", "getcontentlength").item(0)
-                    val sizeBytes = contentLengthNode?.textContent?.toLongOrNull()
+                    val sizeBytes = contentLengthNode?.textContent?.toLongOrNull() ?: 0L
                     
                     val lastModifiedNode = propNode.getElementsByTagNameNS("*", "getlastmodified").item(0)
                     var lastModified: Long? = null
 
                     if (lastModifiedNode != null && !lastModifiedNode.textContent.isNullOrBlank()) {
+
                         val dateStr = lastModifiedNode.textContent
                         try {
-                            lastModified = ZonedDateTime.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME)
-                                .toInstant()
-                                .toEpochMilli()
+                            if (dateStr.contains("0001 00:00:00")) {
+                                lastModified = 0L // 123Pan invalid epoch fallback
+                            } else {
+                                lastModified = java.time.ZonedDateTime.parse(dateStr, java.time.format.DateTimeFormatter.RFC_1123_DATE_TIME)
+                                    .toInstant()
+                                    .toEpochMilli()
+                            }
                         } catch (e: Exception) {
                             Timber.w("Failed to parse lastModified date: $dateStr")
                         }
+
                     }
                     
-                    // URL decode href so the name doesn't contain '%20'
                     val decodedHref = try {
                         java.net.URLDecoder.decode(normalizedHref, "UTF-8")
                     } catch (e: Exception) { normalizedHref }
 
+                    // We need the raw name. Example: "/webdav/B 站保存" -> "B 站保存"
                     val name = decodedHref.substringAfterLast('/')
 
                     if (name.isNotEmpty()) {
@@ -194,7 +202,7 @@ class WebDavSourceClient(
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to parse WebDAV XML.")
+            Timber.e(e, "Failed to parse WebDAV XML. Content was: \n$xmlContent")
             throw java.io.IOException("Failed to parse WebDAV XML", e)
         }
         return entries

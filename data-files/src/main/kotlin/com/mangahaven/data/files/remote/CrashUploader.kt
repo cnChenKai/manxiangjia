@@ -1,4 +1,4 @@
-package com.mangahaven.app.logging
+package com.mangahaven.data.files.remote
 
 import android.content.Context
 import android.content.Intent
