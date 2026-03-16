@@ -24,7 +24,7 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
  */
 @Singleton
 class SettingsDataStore @Inject constructor(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     private object Keys {
         val READING_MODE = stringPreferencesKey("reading_mode")

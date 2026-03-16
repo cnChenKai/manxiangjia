@@ -4,7 +4,7 @@ import android.content.Context
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.mangahaven.data.files.`import`.RemoteScanner
+import com.mangahaven.data.files.importer.RemoteScanner
 import com.mangahaven.data.files.remote.SourceClientFactory
 import com.mangahaven.data.local.repository.LibraryRepository
 import dagger.assisted.Assisted

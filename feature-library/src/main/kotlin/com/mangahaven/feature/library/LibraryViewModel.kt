@@ -3,7 +3,7 @@ package com.mangahaven.feature.library
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.mangahaven.data.files.`import`.SafImporter
+import com.mangahaven.data.files.importer.SafImporter
 import com.mangahaven.data.local.repository.LibraryRepository
 import com.mangahaven.model.LibraryItem
 import dagger.hilt.android.lifecycle.HiltViewModel

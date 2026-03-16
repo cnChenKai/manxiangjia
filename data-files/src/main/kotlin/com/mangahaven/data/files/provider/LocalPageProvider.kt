@@ -18,7 +18,7 @@ import java.io.InputStream
  * 基于 ContainerReader 提供按页访问漫画内容的能力。
  */
 class LocalPageProvider(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
     private val containerTarget: ContainerTarget,
 ) : PageProvider {
 

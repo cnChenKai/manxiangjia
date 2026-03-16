@@ -59,7 +59,7 @@ fun rememberPageImage(
     return imageBitmap
 }
 
-private fun loadSinglePageBitmap(
+private suspend fun loadSinglePageBitmap(
     provider: PageProvider,
     index: Int,
     enableCrop: Boolean

@@ -1,4 +1,4 @@
-package com.mangahaven.data.files
+package com.mangahaven.model.repository
 
 import com.mangahaven.model.ReadingProgress
 

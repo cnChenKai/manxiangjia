@@ -21,7 +21,7 @@ import java.io.FileOutputStream
  * 使用 junrar 读取压缩包中的图片页面。
  */
 class RarArchiveContainerReader(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) : ContainerReader {
 
     // Helper to get a File from URI since Junrar works best with random access File objects

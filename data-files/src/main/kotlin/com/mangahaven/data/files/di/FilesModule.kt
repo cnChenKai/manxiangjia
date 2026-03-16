@@ -1,6 +1,6 @@
 package com.mangahaven.data.files.di
 
-import com.mangahaven.data.files.ProgressRepository
+import com.mangahaven.model.repository.ProgressRepository
 import com.mangahaven.data.local.repository.LocalProgressRepository
 import dagger.Binds
 import dagger.Module
@@ -21,4 +21,18 @@ abstract class FilesBindsModule {
     abstract fun bindProgressRepository(
         impl: LocalProgressRepository,
     ): ProgressRepository
+}
+
+@Module
+@InstallIn(SingletonComponent::class)
+object FilesProvidesModule {
+
+    @dagger.Provides
+    @Singleton
+    fun provideOkHttpClient(): okhttp3.OkHttpClient {
+        return okhttp3.OkHttpClient.Builder()
+            .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+            .build()
+    }
 }

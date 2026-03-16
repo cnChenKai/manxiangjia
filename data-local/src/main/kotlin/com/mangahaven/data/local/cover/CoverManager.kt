@@ -14,7 +14,7 @@ import javax.inject.Singleton
  */
 @Singleton
 class CoverManager @Inject constructor(
-    @ApplicationContext private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     private val coverDir: File by lazy {
         File(context.cacheDir, "covers").also { it.mkdirs() }

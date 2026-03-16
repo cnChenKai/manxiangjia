@@ -18,7 +18,7 @@ private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesD
  */
 @Singleton
 class AppSettingsDataStore @Inject constructor(
-    private val context: Context,
+    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     private object Keys {
         val PRIVACY_LOCK_ENABLED = booleanPreferencesKey("privacy_lock_enabled")

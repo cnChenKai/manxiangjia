@@ -1,4 +1,4 @@
-package com.mangahaven.data.files.`import`
+package com.mangahaven.data.files.importer
 
 import com.mangahaven.data.files.SourceClient
 import com.mangahaven.data.files.container.ImageFileUtils
@@ -36,14 +36,14 @@ class RemoteScanner @Inject constructor(
         try {
             val rootEntries = sourceClient.list(basePath)
             for (entry in rootEntries) {
-                if (ImageFileUtils.isIgnoredEntry(entry.name)) continue
+                if (ImageFileUtils.shouldIgnore(entry.name)) continue
 
                 if (entry.isDirectory) {
                     onProgress("Scanning: ${entry.path}")
                     // 检查此目录本身是否是一本漫画（即只包含图片）
                     val subEntries = sourceClient.list(entry.path)
                     val imgCount = subEntries.count { !it.isDirectory && ImageFileUtils.isImageFile(it.name) }
-                    val dirCount = subEntries.count { it.isDirectory && !ImageFileUtils.isIgnoredEntry(it.name) }
+                    val dirCount = subEntries.count { it.isDirectory && !ImageFileUtils.shouldIgnore(it.name) }
 
                     if (imgCount > 0 && dirCount == 0) {
                         // 这是一个纯图片漫画目录，添加它
