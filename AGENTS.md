@@ -1,270 +1,89 @@
 # AGENTS.md
 
-## Purpose
+## Scope
 
-This repository is an Android project.
+适用于仓库根目录及全部子目录。
 
-Your job as an agent is to restore a healthy Android build with minimal, targeted fixes and to keep working until a Debug APK is actually produced.
+## Mission
 
-Primary goal:
+本仓库以 Android Debug APK 可持续产出为核心目标。所有代理（Codex/Jules/其他 vibe coding agents）都必须遵循：
 
-1. Fix build failures
-2. Ensure `./gradlew assembleDebug --stacktrace` succeeds
-3. Ensure a Debug APK is actually produced
-4. If CI is part of the failure chain, keep the workflow aligned with the local build path
-5. Prepare a clean PR summary of the changes
-
-Do not stop after fixing the first error.
-Do not stop after fixing only the currently known errors.
-Keep iterating until the Debug APK is produced or a true external blocker is proven.
+1. 本地与 CI 构建路径一致
+2. 问题定位有日志、有证据
+3. 改动最小化、可回滚、可验证
 
 ---
 
-## How to work in this repository
+## Required workflow (必须执行)
 
-Use an iterative repair loop:
-
-1. Inspect repository docs and build configuration
-2. Determine the intended build path and environment
-3. Run the relevant Gradle command
-4. Identify the first real blocker
-5. Fix the root cause
-6. Re-run the build
-7. Repeat until the APK is generated
-
-Prefer minimal changes.
-Fix root causes, not only surface symptoms.
-
-Do not:
-- stop after the first partial success
-- only provide analysis without code changes
-- comment out large code paths just to pass compilation
-- remove `override` just to silence errors
-- add fake stubs, fake repositories, or mock implementations unless the existing architecture clearly requires them
-- delete business logic to bypass failures
-- perform broad refactors unrelated to restoring a healthy build
+1. 先阅读：`README.md`、`.github/workflows/android.yml`、`settings.gradle.kts`、`gradle/libs.versions.toml`
+2. 再修改：只修复与当前目标直接相关的问题
+3. 每次关键修改后至少执行：
+   - `./gradlew :data-local:compileDebugKotlin --stacktrace`
+4. 最终必须执行：
+   - `./gradlew assembleDebug --stacktrace`
+5. 必须确认 APK 实际存在：
+   - `*/build/outputs/apk/debug/*.apk`
 
 ---
 
-## Plan expectations
+## Vibe coding guardrails
 
-Before making changes, inspect the repository and form a plan based on the real build setup.
+### 1) 根目录清洁规则
 
-Your plan should account for:
+禁止在仓库根目录新增或遗留以下临时文件：
 
-- repository documentation
-- build configuration
-- Gradle wrapper usage
-- CI workflow behavior
-- the actual APK output path
-- known likely failure areas listed below
+- `patch_*.py`
+- `tmp_*.py`
+- `test_*.py`（非正式测试目录）
+- 一次性调试文本（例如 `*_check.txt`）
 
-After the plan is approved or execution begins, continue directly into the fix/build loop.
-Do not stop after plan creation.
+临时脚本请放到：
 
----
+- `scripts/`（可复用）
+- `docs/`（说明文档）
 
-## Repository inspection order
+### 2) 禁止投机性修复
 
-Before changing code, inspect these if present:
+不要用以下方式“骗过编译”：
 
-- `README.md`
-- `.github/workflows/`
-- `gradle/wrapper/gradle-wrapper.properties`
-- `settings.gradle` / `settings.gradle.kts`
-- root `build.gradle` / `build.gradle.kts`
-- module `build.gradle` / `build.gradle.kts`
-- `gradle/libs.versions.toml`
+- 注释掉大段业务代码
+- 删除 `override` 规避签名问题
+- 写 fake repository / fake implementation 混过构建
+- 大规模重构与任务无关代码
 
-Determine:
+### 3) 输出要求
 
-- expected Gradle wrapper usage
-- JDK / Gradle / AGP / Kotlin version compatibility
-- intended build command
-- actual APK output path
-- whether CI uses the same build path as local development
+最终说明必须包含：
+
+- 根因摘要
+- 修改文件列表
+- 每处修改的必要性
+- 执行过的验证命令
+- APK 实际路径
 
 ---
 
-## Gradle rules
+## CI alignment
 
-Always prefer the Gradle wrapper.
-
-Use:
-
-```bash
-./gradlew
-```
-
-Do not prefer plain:
-
-```bash
-gradle
-```
-
-Primary validation commands:
-
-```bash
-./gradlew :data-local:compileDebugKotlin --stacktrace
-./gradlew assembleDebug --stacktrace
-```
-
-If the first command fails, fix those compiler errors first.
-Then continue to the full APK build.
-
-If wrapper scripts are missing but the repository clearly intends wrapper-based builds, restore or fix them.
+- CI 必须使用 Gradle Wrapper（`./gradlew`）
+- CI 构建入口优先复用仓库脚本：`./scripts/ci/build_debug.sh`
+- 成功时上传 APK；失败时上传构建日志（`build-logs/` + Gradle reports）
 
 ---
 
-## Debug APK expectations
+## Runtime error observability
 
-The main success condition is that a Debug APK is actually produced.
+为支持“只靠语言描述 bug”场景，代理修改涉及稳定性时应优先保证：
 
-Check common output paths such as:
-
-```bash
-app/build/outputs/apk/debug/
-```
-
-If the project uses a different module or output location, detect the real configured path and use that instead.
-
-Do not declare success unless the APK file exists.
+1. 未捕获异常可落盘（崩溃日志）
+2. 日志可从设备导出并归档
+3. 日志字段至少包含：时间、线程、异常消息、堆栈
 
 ---
 
-## CI expectations
-
-If GitHub Actions or another CI workflow is present, keep it aligned with the local build process.
-
-Preferred behavior:
-
-- build with `./gradlew assembleDebug --stacktrace`
-- upload the Debug APK from the real output path
-- upload failure reports only when the build fails
-
-If CI currently uses a different Gradle invocation and that is part of the failure chain, fix it.
-
-Do not break failure-report uploads while fixing APK uploads.
-
-If the task results in a PR, ensure the branch and workflow changes are consistent with passing CI.
-
----
-
-## Known likely failure areas in this repository
-
-Check these early to avoid wasting time:
-
-1. Kotlin compile failures in `:data-local:compileDebugKotlin`
-2. Repository layer out of sync with renamed fields, constructor parameters, DTOs, entities, mappers, or interfaces
-3. Interface path or signature changes causing `override` mismatches
-4. Bad imports or moved packages
-5. Gradle / AGP / Kotlin version mismatch
-6. CI using the wrong Gradle command or not using the wrapper
-7. APK artifact path mismatch in CI upload steps
-
-Known examples previously observed:
-
-- `volumeKeysPaging` unresolved or no longer present
-- `ProgressRepository` unresolved, moved, or renamed
-- `getProgress` / `saveProgress` override mismatch
-- bad or outdated import related to `files`
-
-Treat these as starting points, not stopping points.
-After fixing known issues, keep rebuilding and fix any newly surfaced blockers until the APK is produced.
-
----
-
-## How to fix code
-
-When a symbol is broken, first search the repository for the real current definition.
-
-Search examples:
-
-- `volumeKeysPaging`
-- `ProgressRepository`
-- `getProgress`
-- `saveProgress`
-- `files`
-
-Then fix the call sites to match the current codebase reality.
-
-If a field was renamed:
-- update repository, mapper, constructor, and related call sites consistently
-
-If an interface moved or changed:
-- update imports
-- update implemented interface names
-- update method signatures to match the real interface
-
-Avoid speculative changes.
-Verify with the codebase before editing.
-
----
-
-## Validation order
-
-After each meaningful fix:
-
-```bash
-./gradlew :data-local:compileDebugKotlin --stacktrace
-```
-
-Once that passes:
-
-```bash
-./gradlew assembleDebug --stacktrace
-```
-
-If more errors appear, continue fixing them in sequence.
-
-Only stop when one of these is true:
-
-1. the Debug APK exists
-2. a true external blocker is proven, such as:
-   - missing private credentials
-   - required secrets not available in the environment
-   - unavailable external infrastructure
-   - missing proprietary dependency that cannot be recovered from the repository
-
-If blocked externally, clearly state:
-- what is blocked
-- the exact evidence
-- the minimal human action required
-
----
-
-## Pull request expectations
-
-When the build is restored, prepare a PR summary.
-
-Suggested PR title:
+## Preferred PR title
 
 ```text
 fix(android): restore debug APK build pipeline
 ```
-
-PR description should include:
-
-1. User-visible symptom
-2. Root cause chain
-3. Files changed
-4. Why each change was needed
-5. Validation commands run
-6. Final APK output path
-7. Any remaining risks or follow-up suggestions
-
-Do not claim success without listing the final APK path.
-
----
-
-## Output expectations for the final result
-
-Provide:
-
-1. Root cause summary
-2. Modified file list
-3. Explanation of each change
-4. Validation commands executed
-5. Exact APK output path
-6. PR title
-7. PR description
