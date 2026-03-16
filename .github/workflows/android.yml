@@ -39,14 +39,16 @@ jobs:
             ${{ runner.os }}-gradle-
 
       - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: ./scripts/ci/build_debug.sh
 
       - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         if: success()
         with:
           name: app-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            app/build/outputs/apk/debug/app-debug.apk
+            */build/outputs/apk/debug/*.apk
           retention-days: 7
 
       - name: Upload build reports on failure
@@ -55,6 +57,7 @@ jobs:
         with:
           name: build-reports
           path: |
+            build-logs/
             **/build/reports/
             **/build/outputs/logs/
           retention-days: 3

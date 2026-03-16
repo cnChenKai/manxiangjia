@@ -3,6 +3,8 @@ package com.mangahaven.app
 import android.app.Application
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.*
+import com.mangahaven.app.logging.CrashLogStore
+import com.mangahaven.app.logging.GlobalExceptionLogger
 import com.mangahaven.data.files.worker.LibrarySyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
@@ -29,6 +31,10 @@ class MangaHavenApplication : Application(), Configuration.Provider {
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
         }
+
+        val crashLogStore = CrashLogStore(this)
+        GlobalExceptionLogger(crashLogStore).install()
+        Timber.i("Crash logs directory: %s", crashLogStore.logsDirectoryPath())
 
         androidx.lifecycle.ProcessLifecycleOwner.get().lifecycle.addObserver(appLockManager)
 

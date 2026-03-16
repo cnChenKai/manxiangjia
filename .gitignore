@@ -41,3 +41,8 @@ proguard/
 
 # Room schema exports
 **/schemas/
+
+# Disallow root-level temporary patch scripts from coding agents
+/patch_*.py
+/tmp_*.py
+/*_check.txt
