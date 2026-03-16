@@ -15,6 +15,8 @@ data class Source(
     val authRef: String? = null,
     val isWritable: Boolean = false,
     val lastSyncAt: Long? = null,
+    // Whether this source caches metadata remotely (e.g. OPDS/Remote) instead of downloading files
+    val isVirtual: Boolean = false
 )
 
 /**

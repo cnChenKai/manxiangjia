@@ -11,7 +11,6 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
@@ -21,7 +20,6 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "MangaHaven"
-
 include(":app")
 include(":core-model")
 include(":core-reader")
