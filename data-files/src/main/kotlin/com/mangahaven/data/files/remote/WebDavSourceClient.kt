@@ -115,7 +115,6 @@ class WebDavSourceClient(
             factory.isXIncludeAware = false
             factory.isExpandEntityReferences = false
 
-            // 忽略命名空间带来的解析麻烦
             factory.isNamespaceAware = true
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(xmlContent.byteInputStream())
@@ -123,55 +122,79 @@ class WebDavSourceClient(
             val responses: NodeList = doc.getElementsByTagNameNS("*", "response")
             
             for (i in 0 until responses.length) {
-                val responseNode = responses.item(i) as Element
+                val responseNode = responses.item(i) as org.w3c.dom.Element
                 val hrefNode = responseNode.getElementsByTagNameNS("*", "href").item(0)
-                val href = hrefNode?.textContent ?: continue
+                val href = hrefNode?.textContent?.trim() ?: continue
                 
-                // 跳过父级自身的返回（当 Depth=1 时，第一个 response 通常是目录自身）
                 val normalizedHref = href.trimEnd('/')
-                val normalizedReq = requestPath.trimEnd('/')
-                if (i == 0 && requestPath.isNotEmpty() && normalizedHref.endsWith(normalizedReq)) {
-                    continue 
+                val reqSubPath = requestPath.trimStart('/').trimEnd('/')
+
+                if (reqSubPath.isNotEmpty() && normalizedHref.endsWith(reqSubPath)) {
+                    if (responses.length > 1 && normalizedHref.endsWith(reqSubPath)) continue
+                } else if (reqSubPath.isEmpty() && (normalizedHref.isEmpty() || normalizedHref == "/")) {
+                    if (responses.length > 1) continue
                 }
 
-                val propstatNode = responseNode.getElementsByTagNameNS("*", "propstat").item(0) as? Element
-                val propNode = propstatNode?.getElementsByTagNameNS("*", "prop")?.item(0) as? Element
+                val propstats = responseNode.getElementsByTagNameNS("*", "propstat")
+                var propNode: org.w3c.dom.Element? = null
+
+                for (j in 0 until propstats.length) {
+                    val propstatNode = propstats.item(j) as org.w3c.dom.Element
+                    val statusNode = propstatNode.getElementsByTagNameNS("*", "status").item(0)
+                    val status = statusNode?.textContent ?: ""
+                    if (status.contains("200")) {
+                        propNode = propstatNode.getElementsByTagNameNS("*", "prop").item(0) as? org.w3c.dom.Element
+                        break
+                    }
+                }
+
+                if (propNode == null && propstats.length > 0) {
+                    val propstatNode = propstats.item(0) as org.w3c.dom.Element
+                    propNode = propstatNode.getElementsByTagNameNS("*", "prop").item(0) as? org.w3c.dom.Element
+                }
                 
                 if (propNode != null) {
-                    val isDir = propNode.getElementsByTagNameNS("*", "collection").length > 0
+                    val isDir = propNode.getElementsByTagNameNS("*", "collection").length > 0 || normalizedHref.endsWith("/")
                     
                     val contentLengthNode = propNode.getElementsByTagNameNS("*", "getcontentlength").item(0)
                     val sizeBytes = contentLengthNode?.textContent?.toLongOrNull()
                     
                     val lastModifiedNode = propNode.getElementsByTagNameNS("*", "getlastmodified").item(0)
-                    val lastModified = lastModifiedNode?.textContent?.let { dateStr ->
+                    var lastModified: Long? = null
+
+                    if (lastModifiedNode != null && !lastModifiedNode.textContent.isNullOrBlank()) {
+                        val dateStr = lastModifiedNode.textContent
                         try {
-                            ZonedDateTime.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME)
+                            lastModified = ZonedDateTime.parse(dateStr, DateTimeFormatter.RFC_1123_DATE_TIME)
                                 .toInstant()
                                 .toEpochMilli()
                         } catch (e: Exception) {
-                            Timber.e(e, "Failed to parse lastModified date: $dateStr")
-                            null
+                            Timber.w("Failed to parse lastModified date: $dateStr")
                         }
                     }
                     
-                    val name = normalizedHref.substringAfterLast('/')
-                    val decodedName = try {
-                        java.net.URLDecoder.decode(name, "UTF-8")
-                    } catch (e: Exception) { name }
+                    // URL decode href so the name doesn't contain '%20'
+                    val decodedHref = try {
+                        java.net.URLDecoder.decode(normalizedHref, "UTF-8")
+                    } catch (e: Exception) { normalizedHref }
 
-                    entries.add(
-                        SourceEntry(
-                            name = decodedName,
-                            path = normalizedHref,
-                            isDirectory = isDir,
-                            sizeBytes = sizeBytes,
-                            lastModified = lastModified
+                    val name = decodedHref.substringAfterLast('/')
+
+                    if (name.isNotEmpty()) {
+                        entries.add(
+                            SourceEntry(
+                                name = name,
+                                path = decodedHref,
+                                isDirectory = isDir,
+                                sizeBytes = sizeBytes,
+                                lastModified = lastModified
+                            )
                         )
-                    )
+                    }
                 }
             }
         } catch (e: Exception) {
+            Timber.e(e, "Failed to parse WebDAV XML.")
             throw java.io.IOException("Failed to parse WebDAV XML", e)
         }
         return entries

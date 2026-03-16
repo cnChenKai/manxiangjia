@@ -10,6 +10,8 @@ import java.time.format.DateTimeFormatter
 class CrashLogStore(
     private val context: Context,
 ) {
+    fun getContext(): Context = context
+
     private val logsDir: File
         get() = File(context.filesDir, LOG_DIR).apply { mkdirs() }
 

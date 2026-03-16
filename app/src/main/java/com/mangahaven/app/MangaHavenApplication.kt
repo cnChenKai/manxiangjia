@@ -8,6 +8,7 @@ import com.mangahaven.app.logging.GlobalExceptionLogger
 import com.mangahaven.data.files.worker.LibrarySyncWorker
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
+import com.mangahaven.app.logging.FileLoggingTree
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
@@ -27,10 +28,13 @@ class MangaHavenApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+
         // 仅在 debug 模式下启用 Timber 日志
         if (BuildConfig.DEBUG) {
             Timber.plant(Timber.DebugTree())
+            Timber.plant(FileLoggingTree(this))
         }
+
 
         val crashLogStore = CrashLogStore(this)
         GlobalExceptionLogger(crashLogStore).install()
