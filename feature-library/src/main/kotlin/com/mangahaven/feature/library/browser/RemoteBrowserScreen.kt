@@ -13,6 +13,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.mangahaven.model.SourceEntry
@@ -57,6 +58,16 @@ fun RemoteBrowserScreen(
                 )
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
+                    if (uiState.entries.isEmpty() && uiState.isRoot) {
+                        item {
+                            Text(
+                                text = "空目录或没有内容",
+                                modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                style = MaterialTheme.typography.bodyLarge,
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
                     if (!uiState.isRoot) {
                         item {
                             ListItem(
