@@ -3,6 +3,7 @@ package com.mangahaven.data.files.remote
 import com.mangahaven.data.files.SourceClient
 import com.mangahaven.model.Source
 import com.mangahaven.model.SourceType
+import com.mangahaven.data.files.remote.OpdsSourceClient
 import okhttp3.OkHttpClient
 import javax.inject.Inject
 import javax.inject.Singleton

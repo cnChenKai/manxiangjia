@@ -11,14 +11,12 @@ android {
 
     defaultConfig {
         minSdk = 26
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-
     kotlinOptions {
         jvmTarget = "17"
     }
@@ -28,31 +26,21 @@ dependencies {
     implementation(project(":core-model"))
     implementation(project(":data-local"))
 
-    // AndroidX
+    implementation(libs.core.ktx)
     implementation(libs.documentfile)
 
-    // Network & SMB & Archive
-    implementation(libs.okhttp)
-    implementation(libs.jcifs.ng)
-    implementation(libs.junrar)
-
-    // Hilt
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
 
-    // Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.jcifs.ng)
+    implementation(libs.junrar)
 
-    // Logging
+    implementation(libs.kotlinx.coroutines.core)
     implementation(libs.timber)
 
-    // WorkManager & Job Scheduling
+    implementation(libs.okhttp)
     implementation(libs.workmanager)
     implementation(libs.hilt.work)
-    ksp(libs.hilt.compiler)
 
-    // Testing
     testImplementation(libs.junit)
-    testImplementation(libs.kotlinx.coroutines.test)
 }

@@ -19,6 +19,8 @@ data class LibraryItem(
     val lastReadAt: Long? = null,
     val createdAt: Long,
     val updatedAt: Long,
+    // Avoid local storage burden: track if metadata is strictly remote and shouldn't be deep-scanned locally
+    val isRemoteOnly: Boolean = false
 )
 
 /**
@@ -30,6 +32,8 @@ enum class LibraryItemType {
     ARCHIVE,
     BOOK,
     REMOTE_ENTRY,
+    EPUB,
+    PDF
 }
 
 /**
