@@ -15,6 +15,14 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangahaven.model.ReadingMode
+import androidx.compose.ui.platform.LocalContext
+import com.mangahaven.data.files.remote.CrashUploader
+import kotlinx.coroutines.launch
+import java.io.File
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -96,6 +104,48 @@ fun SettingsScreen(
                 onClick = viewModel::clearCache
             )
             
+
+            SettingsCategoryTitle(title = "开发者选项")
+            val context = LocalContext.current
+            val coroutineScope = rememberCoroutineScope()
+            var isUploading by remember { mutableStateOf(false) }
+
+            SettingsClickableItem(
+                title = if (isUploading) "正在上传日志..." else "上传运行日志",
+                subtitle = "将本地日志文件上传并获取短链接用于排错",
+                onClick = {
+                    if (isUploading) return@SettingsClickableItem
+                    isUploading = true
+                    coroutineScope.launch {
+                        try {
+                            // Find latest log file
+                            val logsDir = File(context.filesDir, "logs")
+                            val latestLog = logsDir.listFiles()?.maxByOrNull { it.lastModified() }
+
+                            if (latestLog != null && latestLog.exists()) {
+                                Toast.makeText(context, "开始上传...", Toast.LENGTH_SHORT).show()
+                                val result = CrashUploader.uploadLogFile(context, latestLog)
+                                if (result.isSuccess) {
+                                    val url = result.getOrNull() ?: "Unknown URL"
+                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                    val clip = ClipData.newPlainText("Log URL", url)
+                                    clipboard.setPrimaryClip(clip)
+                                    Toast.makeText(context, "上传成功！链接已复制到剪贴板: $url", Toast.LENGTH_LONG).show()
+                                } else {
+                                    Toast.makeText(context, "上传失败: ${result.exceptionOrNull()?.message}", Toast.LENGTH_LONG).show()
+                                }
+                            } else {
+                                Toast.makeText(context, "没有找到本地日志文件", Toast.LENGTH_SHORT).show()
+                            }
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "上传出错", Toast.LENGTH_SHORT).show()
+                        } finally {
+                            isUploading = false
+                        }
+                    }
+                }
+            )
+
             Spacer(modifier = Modifier.height(24.dp))
         }
     }
