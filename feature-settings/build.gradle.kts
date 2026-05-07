@@ -32,6 +32,7 @@ android {
 dependencies {
     implementation(project(":core-model"))
     implementation(project(":data-local"))
+    implementation(project(":data-files"))
 
     // Compose
     implementation(platform(libs.compose.bom))
