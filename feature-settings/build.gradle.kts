@@ -53,6 +53,9 @@ dependencies {
     // Logging
     implementation(libs.timber)
 
+    // Coil
+    implementation(libs.coil.compose)
+
     // Testing
     testImplementation(libs.junit)
 }
