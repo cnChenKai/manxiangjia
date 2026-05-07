@@ -59,6 +59,12 @@ class LibraryRepository @Inject constructor(
         }
 
     /**
+     * 获取指定 sourceId 下的所有书架条目 ID。
+     */
+    suspend fun getItemIdsBySource(sourceId: String): Set<String> =
+        libraryItemDao.getIdsBySource(sourceId).toSet()
+
+    /**
      * 根据 ID 获取单个条目。
      */
     suspend fun getItemById(id: String): LibraryItem? =

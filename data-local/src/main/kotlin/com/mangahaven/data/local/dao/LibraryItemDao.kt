@@ -24,6 +24,9 @@ interface LibraryItemDao {
     @Query("SELECT * FROM library_items WHERE sourceId = :sourceId ORDER BY title ASC")
     fun observeBySource(sourceId: String): Flow<List<LibraryItemEntity>>
 
+    @Query("SELECT id FROM library_items WHERE sourceId = :sourceId")
+    suspend fun getIdsBySource(sourceId: String): List<String>
+
     @Query("SELECT * FROM library_items WHERE lastReadAt IS NOT NULL ORDER BY lastReadAt DESC LIMIT :limit")
     fun observeRecentlyRead(limit: Int = 10): Flow<List<LibraryItemEntity>>
 

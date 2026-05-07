@@ -32,6 +32,27 @@ class RemoteScanner @Inject constructor(
         basePath: String,
         onProgress: (String) -> Unit
     ): Int = withContext(Dispatchers.IO) {
+        val existingIds = libraryRepository.getItemIdsBySource(source.id).toMutableSet()
+        val newItemsToInsert = mutableListOf<LibraryItem>()
+
+        val addedCount = scanDirectoryInternal(source, sourceClient, basePath, existingIds, newItemsToInsert, onProgress)
+
+        if (newItemsToInsert.isNotEmpty()) {
+            libraryRepository.addItems(newItemsToInsert)
+            Timber.d("Batch inserted \${newItemsToInsert.size} remote items")
+        }
+
+        addedCount
+    }
+
+    private suspend fun scanDirectoryInternal(
+        source: Source,
+        sourceClient: SourceClient,
+        basePath: String,
+        existingIds: MutableSet<String>,
+        newItemsToInsert: MutableList<LibraryItem>,
+        onProgress: (String) -> Unit
+    ): Int {
         var addedCount = 0
         try {
             val rootEntries = sourceClient.list(basePath)
@@ -39,7 +60,7 @@ class RemoteScanner @Inject constructor(
                 if (ImageFileUtils.shouldIgnore(entry.name)) continue
 
                 if (entry.isDirectory) {
-                    onProgress("Scanning: ${entry.path}")
+                    onProgress("Scanning: \${entry.path}")
                     // 检查此目录本身是否是一本漫画（即只包含图片）
                     val subEntries = sourceClient.list(entry.path)
                     val imgCount = subEntries.count { !it.isDirectory && ImageFileUtils.isImageFile(it.name) }
@@ -47,35 +68,39 @@ class RemoteScanner @Inject constructor(
 
                     if (imgCount > 0 && dirCount == 0) {
                         // 这是一个纯图片漫画目录，添加它
-                        if (addRemoteEntry(source, entry)) {
+                        if (addRemoteEntry(source, entry, existingIds, newItemsToInsert)) {
                             addedCount++
                         }
                     } else if (dirCount > 0) {
                         // 包含子目录，继续递归探测
-                        addedCount += scanDirectory(source, sourceClient, entry.path, onProgress)
+                        addedCount += scanDirectoryInternal(source, sourceClient, entry.path, existingIds, newItemsToInsert, onProgress)
                     }
                 } else if (ImageFileUtils.isArchive(entry.name)) {
                     // 对于远程的 ZIP/CBZ 压缩包，当前 MVP (Phase 3) 也勉强算 REMOTE_ENTRY
                     // TODO: 等待下载缓存支持
-                    if (addRemoteEntry(source, entry)) {
+                    if (addRemoteEntry(source, entry, existingIds, newItemsToInsert)) {
                         addedCount++
                     }
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Error scanning remote directory: $basePath")
+            Timber.e(e, "Error scanning remote directory: \$basePath")
         }
-        addedCount
+        return addedCount
     }
 
-    private suspend fun addRemoteEntry(source: Source, entry: SourceEntry): Boolean {
+    private fun addRemoteEntry(
+        source: Source,
+        entry: SourceEntry,
+        existingIds: MutableSet<String>,
+        newItemsToInsert: MutableList<LibraryItem>
+    ): Boolean {
         // 判断库里是否已存在
         val existingHash = (source.id + entry.path).hashCode().toString()
         // 此查重比较粗糙，最好有唯一路径约束，这里简单生成个相对稳定的组合 id
-        val itemId = UUID.nameUUIDFromBytes("${source.id}:${entry.path}".toByteArray()).toString()
+        val itemId = UUID.nameUUIDFromBytes("\${source.id}:\${entry.path}".toByteArray()).toString()
         
-        val existing = libraryRepository.getItemById(itemId)
-        if (existing != null) return false
+        if (existingIds.contains(itemId)) return false
 
         val item = LibraryItem(
             id = itemId,
@@ -88,8 +113,9 @@ class RemoteScanner @Inject constructor(
             updatedAt = System.currentTimeMillis()
         )
         
-        libraryRepository.addItem(item)
-        Timber.d("Added remote item: ${item.title}")
+        existingIds.add(itemId)
+        newItemsToInsert.add(item)
+        Timber.d("Added remote item to batch: \${item.title}")
         return true
     }
 }
