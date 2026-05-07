@@ -24,6 +24,7 @@ fun SettingsScreen(
 ) {
     val privacyLockEnabled by viewModel.privacyLockEnabled.collectAsStateWithLifecycle()
     val readerSettings by viewModel.readerSettings.collectAsStateWithLifecycle()
+    val cacheSize by viewModel.cacheSize.collectAsStateWithLifecycle()
 
     Scaffold(
         topBar = {
@@ -91,8 +92,8 @@ fun SettingsScreen(
             SettingsCategoryTitle(title = "数据与存储")
             SettingsClickableItem(
                 title = "清理图片缓存",
-                subtitle = "当前缓存: 0 MB",
-                onClick = { /* TODO */ }
+                subtitle = "当前缓存: $cacheSize",
+                onClick = viewModel::clearCache
             )
             
             Spacer(modifier = Modifier.height(24.dp))
