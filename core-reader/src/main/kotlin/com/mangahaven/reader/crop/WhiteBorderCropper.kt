@@ -62,10 +62,13 @@ object WhiteBorderCropper {
         val h = bitmap.height
         if (w < 10 || h < 10) return null
 
-        val top = findTopBorder(bitmap, w, h, threshold)
-        val bottom = findBottomBorder(bitmap, w, h, threshold)
-        val left = findLeftBorder(bitmap, w, h, threshold)
-        val right = findRightBorder(bitmap, w, h, threshold)
+        // 预分配缓冲区，减少循环内的重复分配
+        val pixelBuffer = IntArray(maxOf(w, h))
+
+        val top = findTopBorder(bitmap, w, h, threshold, pixelBuffer)
+        val bottom = findBottomBorder(bitmap, w, h, threshold, pixelBuffer)
+        val left = findLeftBorder(bitmap, w, h, threshold, pixelBuffer)
+        val right = findRightBorder(bitmap, w, h, threshold, pixelBuffer)
 
         // 验证裁切是否合理
         val cropWidth = left + (w - right)
@@ -80,52 +83,54 @@ object WhiteBorderCropper {
         return Rect(left, top, right, bottom)
     }
 
-    private fun findTopBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+    private fun findTopBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int, pixels: IntArray): Int {
         for (y in 0 until h step SAMPLE_STEP) {
-            if (!isRowWhite(bitmap, y, w, threshold)) return y
+            if (!isRowWhite(bitmap, y, w, threshold, pixels)) return y
         }
         return 0
     }
 
-    private fun findBottomBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+    private fun findBottomBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int, pixels: IntArray): Int {
         for (y in (h - 1) downTo 0 step SAMPLE_STEP) {
-            if (!isRowWhite(bitmap, y, w, threshold)) return y + 1
+            if (!isRowWhite(bitmap, y, w, threshold, pixels)) return y + 1
         }
         return h
     }
 
-    private fun findLeftBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+    private fun findLeftBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int, pixels: IntArray): Int {
         for (x in 0 until w step SAMPLE_STEP) {
-            if (!isColumnWhite(bitmap, x, h, threshold)) return x
+            if (!isColumnWhite(bitmap, x, h, threshold, pixels)) return x
         }
         return 0
     }
 
-    private fun findRightBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+    private fun findRightBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int, pixels: IntArray): Int {
         for (x in (w - 1) downTo 0 step SAMPLE_STEP) {
-            if (!isColumnWhite(bitmap, x, h, threshold)) return x + 1
+            if (!isColumnWhite(bitmap, x, h, threshold, pixels)) return x + 1
         }
         return w
     }
 
-    private fun isRowWhite(bitmap: Bitmap, y: Int, w: Int, threshold: Int): Boolean {
+    private fun isRowWhite(bitmap: Bitmap, y: Int, w: Int, threshold: Int, pixels: IntArray): Boolean {
+        bitmap.getPixels(pixels, 0, w, 0, y, w, 1)
         for (x in 0 until w step SAMPLE_STEP) {
-            if (!isPixelWhite(bitmap.getPixel(x, y), threshold)) return false
+            if (!isPixelWhite(pixels[x], threshold)) return false
         }
         return true
     }
 
-    private fun isColumnWhite(bitmap: Bitmap, x: Int, h: Int, threshold: Int): Boolean {
+    private fun isColumnWhite(bitmap: Bitmap, x: Int, h: Int, threshold: Int, pixels: IntArray): Boolean {
+        bitmap.getPixels(pixels, 0, 1, x, 0, 1, h)
         for (y in 0 until h step SAMPLE_STEP) {
-            if (!isPixelWhite(bitmap.getPixel(x, y), threshold)) return false
+            if (!isPixelWhite(pixels[y], threshold)) return false
         }
         return true
     }
 
     private fun isPixelWhite(pixel: Int, threshold: Int): Boolean {
-        val r = Color.red(pixel)
-        val g = Color.green(pixel)
-        val b = Color.blue(pixel)
+        val r = (pixel shr 16) and 0xFF
+        val g = (pixel shr 8) and 0xFF
+        val b = pixel and 0xFF
         return r >= threshold && g >= threshold && b >= threshold
     }
 }
