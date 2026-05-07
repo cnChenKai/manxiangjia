@@ -15,6 +15,7 @@ import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.InputStream
 import java.io.FileOutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * RAR/CBR 容器读取器。
@@ -23,6 +24,9 @@ import java.io.FileOutputStream
 class RarArchiveContainerReader(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) : ContainerReader {
+
+    // Cache entry lookup metadata: archive Uri string -> (entryPath -> index in fileHeaders)
+    private val headerIndexCache = ConcurrentHashMap<String, Map<String, Int>>()
 
     // Helper to get a File from URI since Junrar works best with random access File objects
     private suspend fun getTempFile(uri: Uri): File = withContext(Dispatchers.IO) {
@@ -38,6 +42,7 @@ class RarArchiveContainerReader(
     override suspend fun listPages(target: ContainerTarget): List<PageRef> =
         withContext(Dispatchers.IO) {
             val uri = Uri.parse(target.path)
+            val uriString = uri.toString()
             val entries = mutableListOf<RarEntryInfo>()
             var tempFile: File? = null
 
@@ -45,9 +50,18 @@ class RarArchiveContainerReader(
                 tempFile = getTempFile(uri)
                 val archive = Archive(tempFile)
                 val fileHeaders = archive.fileHeaders
-                for (header in fileHeaders) {
+
+                val indexMap = mutableMapOf<String, Int>()
+
+                for (i in fileHeaders.indices) {
+                    val header = fileHeaders[i]
+                    val name = header.fileName ?: header.fileNameW
+
+                    if (name != null) {
+                        indexMap[name] = i
+                    }
+
                     if (!header.isDirectory) {
-                        val name = header.fileName ?: header.fileNameW
                         if (name != null &&
                             ImageFileUtils.isImageFile(name) &&
                             !ImageFileUtils.shouldIgnore(name) &&
@@ -63,6 +77,8 @@ class RarArchiveContainerReader(
                         }
                     }
                 }
+
+                headerIndexCache[uriString] = indexMap
             } catch (e: Exception) {
                 Timber.e(e, "Failed to list pages in RAR archive: ${target.path}")
                 return@withContext emptyList()
@@ -101,9 +117,35 @@ class RarArchiveContainerReader(
                 tempFile = getTempFile(archiveUri)
                 val archive = Archive(tempFile)
                 val fileHeaders = archive.fileHeaders
-                for (header in fileHeaders) {
+                val uriString = archiveUri.toString()
+
+                // Fast path: cached index lookup
+                val cachedIndices = headerIndexCache[uriString]
+                if (cachedIndices != null) {
+                    val index = cachedIndices[entryPath]
+                    if (index != null && index >= 0 && index < fileHeaders.size) {
+                        val header = fileHeaders[index]
+                        val name = header.fileName ?: header.fileNameW
+                        if (name == entryPath) {
+                            val baos = ByteArrayOutputStream()
+                            archive.extractFile(header, baos)
+                            return@withContext ByteArrayInputStream(baos.toByteArray())
+                        }
+                    }
+                }
+
+                // Fallback path: linear scan
+                for (i in fileHeaders.indices) {
+                    val header = fileHeaders[i]
                     val name = header.fileName ?: header.fileNameW
                     if (name == entryPath) {
+                        // Opportunistic cache update for the single entry if cache didn't exist or was wrong
+                        // Note: A full listPages call is needed to fully populate the cache, but this helps
+                        // if listPages wasn't called.
+                        val currentMap = headerIndexCache[uriString]?.toMutableMap() ?: mutableMapOf()
+                        currentMap[entryPath] = i
+                        headerIndexCache[uriString] = currentMap
+
                         val baos = ByteArrayOutputStream()
                         archive.extractFile(header, baos)
                         return@withContext ByteArrayInputStream(baos.toByteArray())
