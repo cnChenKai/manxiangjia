@@ -1,7 +1,6 @@
 package com.mangahaven.reader.crop
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.Rect
 import timber.log.Timber
 
@@ -128,6 +127,7 @@ object WhiteBorderCropper {
     }
 
     private fun isPixelWhite(pixel: Int, threshold: Int): Boolean {
+        // 使用位运算手动提取 RGB，减少 JNI 调用开销
         val r = (pixel shr 16) and 0xFF
         val g = (pixel shr 8) and 0xFF
         val b = pixel and 0xFF
