@@ -54,5 +54,7 @@ dependencies {
 
     // Testing
     testImplementation(libs.junit)
+    testImplementation(libs.mockwebserver)
+
     testImplementation(libs.kotlinx.coroutines.test)
 }
