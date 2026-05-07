@@ -9,8 +9,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+import java.io.BufferedWriter
+import java.util.concurrent.atomic.AtomicInteger
+
 class FileLoggingTree(context: Context) : Timber.DebugTree() {
     private val logFile: File
+    private val timeFormat = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
+    private var writer: BufferedWriter? = null
+    private val logCount = AtomicInteger(0)
 
     init {
         val logDir = File(context.filesDir, "logs")
@@ -20,13 +26,19 @@ class FileLoggingTree(context: Context) : Timber.DebugTree() {
         val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
         val dateString = dateFormat.format(Date())
         logFile = File(logDir, "log_$dateString.txt")
+        try {
+            writer = BufferedWriter(FileWriter(logFile, true))
+        } catch (e: Exception) {
+            Log.e("FileLoggingTree", "Error initializing writer", e)
+        }
     }
 
+    @Synchronized
     override fun log(priority: Int, tag: String?, message: String, t: Throwable?) {
         super.log(priority, tag, message, t)
 
         try {
-            val timestamp = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()).format(Date())
+            val timestamp = timeFormat.format(Date())
             val priorityStr = when (priority) {
                 Log.VERBOSE -> "V"
                 Log.DEBUG -> "D"
@@ -39,15 +51,31 @@ class FileLoggingTree(context: Context) : Timber.DebugTree() {
 
             val logMessage = "$timestamp $priorityStr/$tag: $message\n"
 
-            FileWriter(logFile, true).use { writer ->
-                writer.append(logMessage)
+            writer?.let { w ->
+                w.append(logMessage)
                 t?.let {
-                    writer.append(Log.getStackTraceString(it))
-                    writer.append("\n")
+                    w.append(Log.getStackTraceString(it))
+                    w.append("\n")
+                }
+
+                // Periodically flush (e.g. every 50 logs)
+                if (logCount.incrementAndGet() % 50 == 0) {
+                    w.flush()
                 }
             }
         } catch (e: Exception) {
             Log.e("FileLoggingTree", "Error writing to log file", e)
+        }
+    }
+
+    @Synchronized
+    fun close() {
+        try {
+            writer?.flush()
+            writer?.close()
+            writer = null
+        } catch (e: Exception) {
+            Log.e("FileLoggingTree", "Error closing writer", e)
         }
     }
 }
