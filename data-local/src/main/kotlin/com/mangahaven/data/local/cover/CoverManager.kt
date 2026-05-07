@@ -13,11 +13,15 @@ import javax.inject.Singleton
  * 负责提取容器封面并缓存到应用私有目录。
  */
 @Singleton
-class CoverManager @Inject constructor(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
+class CoverManager(
+    private val context: Context?,
+    private val overrideCoverDir: File? = null
 ) {
+    @Inject
+    constructor(@dagger.hilt.android.qualifiers.ApplicationContext context: Context) : this(context, null)
+
     private val coverDir: File by lazy {
-        File(context.cacheDir, "covers").also { it.mkdirs() }
+        overrideCoverDir ?: File(context!!.cacheDir, "covers").also { it.mkdirs() }
     }
 
     /**
