@@ -1,7 +1,6 @@
 package com.mangahaven.reader.crop
 
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.Rect
 import timber.log.Timber
 
@@ -81,51 +80,60 @@ object WhiteBorderCropper {
     }
 
     private fun findTopBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+        val row = IntArray(w)
         for (y in 0 until h step SAMPLE_STEP) {
-            if (!isRowWhite(bitmap, y, w, threshold)) return y
+            bitmap.getPixels(row, 0, w, 0, y, w, 1)
+            if (!isRowWhite(row, threshold)) return y
         }
         return 0
     }
 
     private fun findBottomBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+        val row = IntArray(w)
         for (y in (h - 1) downTo 0 step SAMPLE_STEP) {
-            if (!isRowWhite(bitmap, y, w, threshold)) return y + 1
+            bitmap.getPixels(row, 0, w, 0, y, w, 1)
+            if (!isRowWhite(row, threshold)) return y + 1
         }
         return h
     }
 
     private fun findLeftBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+        val col = IntArray(h)
         for (x in 0 until w step SAMPLE_STEP) {
-            if (!isColumnWhite(bitmap, x, h, threshold)) return x
+            bitmap.getPixels(col, 0, 1, x, 0, 1, h)
+            if (!isColumnWhite(col, threshold)) return x
         }
         return 0
     }
 
     private fun findRightBorder(bitmap: Bitmap, w: Int, h: Int, threshold: Int): Int {
+        val col = IntArray(h)
         for (x in (w - 1) downTo 0 step SAMPLE_STEP) {
-            if (!isColumnWhite(bitmap, x, h, threshold)) return x + 1
+            bitmap.getPixels(col, 0, 1, x, 0, 1, h)
+            if (!isColumnWhite(col, threshold)) return x + 1
         }
         return w
     }
 
-    private fun isRowWhite(bitmap: Bitmap, y: Int, w: Int, threshold: Int): Boolean {
-        for (x in 0 until w step SAMPLE_STEP) {
-            if (!isPixelWhite(bitmap.getPixel(x, y), threshold)) return false
+    private fun isRowWhite(row: IntArray, threshold: Int): Boolean {
+        for (x in row.indices step SAMPLE_STEP) {
+            if (!isPixelWhite(row[x], threshold)) return false
         }
         return true
     }
 
-    private fun isColumnWhite(bitmap: Bitmap, x: Int, h: Int, threshold: Int): Boolean {
-        for (y in 0 until h step SAMPLE_STEP) {
-            if (!isPixelWhite(bitmap.getPixel(x, y), threshold)) return false
+    private fun isColumnWhite(col: IntArray, threshold: Int): Boolean {
+        for (y in col.indices step SAMPLE_STEP) {
+            if (!isPixelWhite(col[y], threshold)) return false
         }
         return true
     }
 
     private fun isPixelWhite(pixel: Int, threshold: Int): Boolean {
-        val r = Color.red(pixel)
-        val g = Color.green(pixel)
-        val b = Color.blue(pixel)
+        // Optimized color extraction using bitwise shifts instead of Color.red/green/blue
+        val r = (pixel shr 16) and 0xFF
+        val g = (pixel shr 8) and 0xFF
+        val b = pixel and 0xFF
         return r >= threshold && g >= threshold && b >= threshold
     }
 }
