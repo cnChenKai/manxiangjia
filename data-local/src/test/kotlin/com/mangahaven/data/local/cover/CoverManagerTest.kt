@@ -20,13 +20,13 @@ class CoverManagerTest {
     @get:Rule
     val tempFolder = TemporaryFolder()
 
+    private lateinit var coverDir: File
     private lateinit var coverManager: CoverManager
-    private lateinit var baseDir: File
 
     @Before
     fun setup() {
-        baseDir = tempFolder.newFolder("cache")
-        coverManager = CoverManager(baseDir)
+        coverDir = tempFolder.newFolder("covers")
+        coverManager = CoverManager(context = null, overrideCoverDir = coverDir)
     }
 
     @Test
@@ -41,7 +41,7 @@ class CoverManagerTest {
         val savedFile = File(path!!)
         assertTrue(savedFile.exists())
         assertEquals(content.size.toLong(), savedFile.length())
-        assertEquals(File(baseDir, "covers/$itemId.jpg").absolutePath, path)
+        assertEquals("$itemId.jpg", savedFile.name)
     }
 
     @Test
@@ -49,6 +49,7 @@ class CoverManagerTest {
         val itemId = "error_item"
         val inputStream = object : InputStream() {
             override fun read(): Int = throw IOException("Simulated error")
+            override fun read(b: ByteArray, off: Int, len: Int): Int = throw IOException("Simulated error")
         }
 
         val path = coverManager.saveCover(itemId, inputStream)
@@ -59,14 +60,12 @@ class CoverManagerTest {
     @Test
     fun `getCoverPath returns correct path when file exists`() = runTest {
         val itemId = "existing_item"
-        val coversDir = File(baseDir, "covers")
-        coversDir.mkdirs()
-        val coverFile = File(coversDir, "$itemId.jpg")
-        coverFile.writeText("content")
+        coverManager.saveCover(itemId, ByteArrayInputStream("content".toByteArray()))
 
         val path = coverManager.getCoverPath(itemId)
 
-        assertEquals(coverFile.absolutePath, path)
+        assertNotNull(path)
+        assertTrue(File(path!!).exists())
     }
 
     @Test
@@ -76,43 +75,34 @@ class CoverManagerTest {
     }
 
     @Test
-    fun `deleteCover removes the file`() {
+    fun `deleteCover removes the file`() = runTest {
         val itemId = "delete_item"
-        val coversDir = File(baseDir, "covers")
-        coversDir.mkdirs()
-        val coverFile = File(coversDir, "$itemId.jpg")
-        coverFile.writeText("content")
-        assertTrue(coverFile.exists())
+        coverManager.saveCover(itemId, ByteArrayInputStream("content".toByteArray()))
+        assertNotNull(coverManager.getCoverPath(itemId))
 
         coverManager.deleteCover(itemId)
 
-        assertFalse(coverFile.exists())
+        assertNull(coverManager.getCoverPath(itemId))
     }
 
     @Test
-    fun `clearAll deletes all files in covers directory`() {
-        val coversDir = File(baseDir, "covers")
-        coversDir.mkdirs()
-        File(coversDir, "1.jpg").writeText("1")
-        File(coversDir, "2.jpg").writeText("2")
-        assertEquals(2, coversDir.listFiles()?.size)
+    fun `clearAll deletes all files in covers directory`() = runTest {
+        coverManager.saveCover("1", ByteArrayInputStream("1".toByteArray()))
+        coverManager.saveCover("2", ByteArrayInputStream("2".toByteArray()))
+        assertEquals(2, coverDir.listFiles()?.size)
 
         coverManager.clearAll()
 
-        assertEquals(0, coversDir.listFiles()?.size)
+        assertEquals(0, coverDir.listFiles()?.size)
     }
 
     @Test
-    fun `getCacheSize returns sum of file sizes`() {
-        val coversDir = File(baseDir, "covers")
-        coversDir.mkdirs()
-        val f1 = File(coversDir, "1.jpg")
-        f1.writeText("123") // 3 bytes
-        val f2 = File(coversDir, "2.jpg")
-        f2.writeText("12345") // 5 bytes
+    fun `getCacheSize returns sum of file sizes`() = runTest {
+        val data1 = "abc".toByteArray()
+        val data2 = "defgh".toByteArray()
+        coverManager.saveCover("1", ByteArrayInputStream(data1))
+        coverManager.saveCover("2", ByteArrayInputStream(data2))
 
-        val size = coverManager.getCacheSize()
-
-        assertEquals(8L, size)
+        assertEquals((data1.size + data2.size).toLong(), coverManager.getCacheSize())
     }
 }

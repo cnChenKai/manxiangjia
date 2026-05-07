@@ -14,13 +14,14 @@ import javax.inject.Singleton
  */
 @Singleton
 class CoverManager(
-    private val baseDir: File
+    private val context: Context?,
+    private val overrideCoverDir: File? = null
 ) {
     @Inject
-    constructor(@ApplicationContext context: Context) : this(context.cacheDir)
+    constructor(@ApplicationContext context: Context) : this(context, null)
 
     private val coverDir: File by lazy {
-        File(baseDir, "covers").also { it.mkdirs() }
+        overrideCoverDir ?: File(context!!.cacheDir, "covers").also { it.mkdirs() }
     }
 
     /**
