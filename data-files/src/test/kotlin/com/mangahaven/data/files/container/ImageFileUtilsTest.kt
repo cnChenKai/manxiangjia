@@ -21,6 +21,7 @@ class ImageFileUtilsTest {
         assertFalse(ImageFileUtils.isImageFile("test.txt"))
         assertFalse(ImageFileUtils.isImageFile("archive.zip"))
         assertFalse(ImageFileUtils.isImageFile("no_extension"))
+        assertFalse(ImageFileUtils.isImageFile("test."))
     }
 
     @Test
@@ -30,6 +31,7 @@ class ImageFileUtilsTest {
         assertTrue(ImageFileUtils.shouldIgnore("Thumbs.db"))
         assertTrue(ImageFileUtils.shouldIgnore("desktop.ini"))
         assertTrue(ImageFileUtils.shouldIgnore("._.DS_Store"))
+        assertTrue(ImageFileUtils.shouldIgnore("THUMBS.DB"))
 
         assertFalse(ImageFileUtils.shouldIgnore("normal_file.jpg"))
         assertFalse(ImageFileUtils.shouldIgnore("folder/page1.png"))
@@ -39,6 +41,7 @@ class ImageFileUtilsTest {
     fun testGetMimeType() {
         assertEquals("image/jpeg", ImageFileUtils.getMimeType("test.jpg"))
         assertEquals("image/jpeg", ImageFileUtils.getMimeType("test.jpeg"))
+        assertEquals("image/jpeg", ImageFileUtils.getMimeType("test.JPEG"))
         assertEquals("image/png", ImageFileUtils.getMimeType("test.png"))
         assertEquals("image/webp", ImageFileUtils.getMimeType("test.webp"))
         assertEquals("image/gif", ImageFileUtils.getMimeType("test.gif"))
@@ -55,9 +58,11 @@ class ImageFileUtilsTest {
         assertTrue(ImageFileUtils.isArchive("test.cbz"))
         assertTrue(ImageFileUtils.isArchive("test.rar"))
         assertTrue(ImageFileUtils.isArchive("test.cbr"))
+        assertTrue(ImageFileUtils.isArchive("TEST.ZIP"))
 
         assertFalse(ImageFileUtils.isArchive("test.jpg"))
         assertFalse(ImageFileUtils.isArchive("test.pdf"))
+        assertFalse(ImageFileUtils.isArchive("test.txt"))
     }
 
     @Test
@@ -78,19 +83,7 @@ class ImageFileUtilsTest {
         assertTrue(comparator.compare("page10", "page2") > 0)
         assertTrue(comparator.compare("2.jpg", "10.jpg") < 0)
 
-        // Leading zeros (current implementation: page01 and page1 are equal if numeric part is 1)
-        // Actually, let's see how current implementation handles it:
-        // "page01" vs "page1"
-        // numA = 1, numB = 1 -> cmp = 0. But after the while loops, i and j are at the end.
-        // Wait, if numA and numB are equal, it doesn't return, it continues the loop.
-        // In "page01" vs "page1":
-        // p=p, a=a, g=g, e=e. Then i=4 ('0'), j=4 ('1').
-        // ca='0', cb='1'. Both are digits.
-        // numA: '0' -> 0, '1' -> 1. numA = 1. i = 6.
-        // numB: '1' -> 1. numB = 1. j = 5.
-        // cmp = 0. Loop continues.
-        // a.length = 6, b.length = 5.
-        // Returns 6 - 5 = 1. So "page01" > "page1".
+        // Leading zeros
         assertTrue(comparator.compare("page01", "page1") > 0)
         assertTrue(comparator.compare("page1", "page01") < 0)
 
@@ -112,8 +105,7 @@ class ImageFileUtilsTest {
         assertTrue(comparator.compare("abc", "abcd") < 0)
         assertTrue(comparator.compare("abcd", "abc") > 0)
 
-        // Large numbers (Long.MAX_VALUE is about 9e18)
-        // Our implementation uses Long, so it should handle up to 18-19 digits.
+        // Large numbers
         assertTrue(comparator.compare("1000000000000000000", "2000000000000000000") < 0)
     }
 }
