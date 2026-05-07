@@ -2,22 +2,41 @@ package com.mangahaven.feature.settings
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.content.Context
+import coil.imageLoader
+import com.mangahaven.data.files.thumbnail.ThumbnailGenerator
 import com.mangahaven.data.local.AppSettingsDataStore
 import com.mangahaven.data.local.SettingsDataStore
+import com.mangahaven.data.local.cover.CoverManager
 import com.mangahaven.model.ReaderSettings
 import com.mangahaven.model.ReadingMode
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val appSettingsDataStore: AppSettingsDataStore,
-    private val settingsDataStore: SettingsDataStore
+    private val settingsDataStore: SettingsDataStore,
+    private val coverManager: CoverManager,
+    private val thumbnailGenerator: ThumbnailGenerator,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    private val _cacheSize = MutableStateFlow("0 MB")
+    val cacheSize: StateFlow<String> = _cacheSize.asStateFlow()
+
+    init {
+        updateCacheSize()
+    }
 
     val privacyLockEnabled: StateFlow<Boolean> = appSettingsDataStore.privacyLockEnabledFlow
         .stateIn(
@@ -61,5 +80,38 @@ class SettingsViewModel @Inject constructor(
 
     fun toggleKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch { settingsDataStore.updateSettings(readerSettings.value.copy(keepScreenOn = enabled)) }
+    }
+
+    fun clearCache() {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                // 清理封面
+                coverManager.clearAll()
+                // 清理缩略图
+                thumbnailGenerator.clearAll()
+                // 清理 Coil
+                context.imageLoader.diskCache?.clear()
+                context.imageLoader.memoryCache?.clear()
+            }
+            updateCacheSize()
+        }
+    }
+
+    private fun updateCacheSize() {
+        viewModelScope.launch {
+            val size = withContext(Dispatchers.IO) {
+                val coverSize = coverManager.getCacheSize()
+                val thumbnailSize = thumbnailGenerator.getCacheSize()
+                val coilSize = context.imageLoader.diskCache?.size ?: 0L
+                coverSize + thumbnailSize + coilSize
+            }
+            _cacheSize.value = formatSize(size)
+        }
+    }
+
+    private fun formatSize(size: Long): String {
+        if (size <= 0) return "0 MB"
+        val mb = size.toDouble() / (1024 * 1024)
+        return String.format("%.2f MB", mb)
     }
 }
