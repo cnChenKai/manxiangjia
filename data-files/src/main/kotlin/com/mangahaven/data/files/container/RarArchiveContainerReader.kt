@@ -48,7 +48,11 @@ class RarArchiveContainerReader(
                 for (header in fileHeaders) {
                     if (!header.isDirectory) {
                         val name = header.fileName ?: header.fileNameW
-                        if (name != null && ImageFileUtils.isImageFile(name) && !ImageFileUtils.shouldIgnore(name)) {
+                        if (name != null &&
+                            ImageFileUtils.isImageFile(name) &&
+                            !ImageFileUtils.shouldIgnore(name) &&
+                            !name.contains("..")
+                        ) {
                             entries.add(
                                 RarEntryInfo(
                                     name = name.substringAfterLast('\\').substringAfterLast('/'),
