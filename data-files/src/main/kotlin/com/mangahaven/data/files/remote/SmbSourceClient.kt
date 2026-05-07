@@ -24,8 +24,17 @@ class SmbSourceClient(
         val authRef = source.authRef
         if (authRef != null && authRef.contains(":")) {
             val parts = authRef.split(":", limit = 2)
-            // 简单支持 username:password
-            val auth = NtlmPasswordAuthenticator("", parts[0], parts[1])
+            val domainAndUser = parts[0]
+            val password = parts[1]
+
+            val (domain, username) = if (domainAndUser.contains(";")) {
+                val subParts = domainAndUser.split(";", limit = 2)
+                subParts[0] to subParts[1]
+            } else {
+                "" to domainAndUser
+            }
+
+            val auth = NtlmPasswordAuthenticator(domain, username, password)
             baseContext.withCredentials(auth)
         } else {
             // Guest 匿名访问

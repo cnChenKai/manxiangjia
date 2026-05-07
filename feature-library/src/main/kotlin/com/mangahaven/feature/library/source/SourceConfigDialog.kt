@@ -18,6 +18,7 @@ fun SourceConfigDialog(
 ) {
     var name by remember { mutableStateOf("") }
     var urlOrIp by remember { mutableStateOf("") }
+    var domain by remember { mutableStateOf("") }
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
@@ -43,6 +44,15 @@ fun SourceConfigDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
+                if (sourceType == SourceType.SMB) {
+                    OutlinedTextField(
+                        value = domain,
+                        onValueChange = { domain = it },
+                        label = { Text("域名 (可选)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 OutlinedTextField(
                     value = username,
                     onValueChange = { username = it },
@@ -64,7 +74,11 @@ fun SourceConfigDialog(
                 onClick = {
                     if (name.isNotBlank() && urlOrIp.isNotBlank()) {
                         val authRef = if (username.isNotBlank() && password.isNotBlank()) {
-                            "$username:$password"
+                            if (sourceType == SourceType.SMB && domain.isNotBlank()) {
+                                "$domain;$username:$password"
+                            } else {
+                                "$username:$password"
+                            }
                         } else null
                         
                         val newSource = Source(
