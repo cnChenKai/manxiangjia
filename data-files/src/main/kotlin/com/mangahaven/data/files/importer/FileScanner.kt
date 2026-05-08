@@ -23,7 +23,7 @@ data class ScanResult(
 
 /**
  * 文件扫描器。
- * 扫描 SAF 目录中的漫画文件和图片，识别 ZIP、CBZ 和图片文件夹。
+ * 扫描 SAF 目录中的漫画文件和图片，识别 ZIP、CBZ、EPUB、MOBI 和图片文件夹。
  */
 
 @Singleton
@@ -31,7 +31,32 @@ class FileScanner @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     companion object {
-        private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz", "rar", "cbr")
+        private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz")
+        private val RAR_EXTENSIONS = setOf("rar", "cbr")
+        private val EBOOK_EXTENSIONS = setOf("epub")
+        private val MOBI_EXTENSIONS = setOf("mobi", "prc")
+
+        private val ARCHIVE_MIME_TYPES = setOf(
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-cbz-compressed",
+            "application/vnd.comicbook+zip",
+        )
+
+        private val RAR_MIME_TYPES = setOf(
+            "application/x-rar-compressed",
+            "application/vnd.comicbook-rar",
+            "application/x-cbr",
+        )
+
+        private val EPUB_MIME_TYPES = setOf(
+            "application/epub+zip",
+        )
+
+        private val MOBI_MIME_TYPES = setOf(
+            "application/x-mobipocket-ebook",
+            "application/x-mobi",
+        )
     }
 
     /**
@@ -72,8 +97,8 @@ class FileScanner @Inject constructor(
 
             // 扫描子项
             for (child in children) {
-                val name = child.name ?: continue
-                if (ImageFileUtils.shouldIgnore(name)) continue
+                val name = child.name
+                if (name != null && ImageFileUtils.shouldIgnore(name)) continue
 
                 when {
                     // 子目录：检查是否包含图片
@@ -86,7 +111,7 @@ class FileScanner @Inject constructor(
                         if (subImages > 0) {
                             results.add(
                                 ScanResult(
-                                    title = name,
+                                    title = name ?: child.uri.lastPathSegment ?: "未命名目录",
                                     path = child.uri.toString(),
                                     itemType = LibraryItemType.FOLDER,
                                     pageCount = subImages,
@@ -94,14 +119,51 @@ class FileScanner @Inject constructor(
                             )
                         }
                     }
-                    // 压缩包
-                    child.isFile && isArchiveFile(name) -> {
+                    // EPUB
+                    child.isFile && isEbookFile(name, child.type) -> {
+                        val title = name ?: child.uri.lastPathSegment ?: "未命名 EPUB"
                         results.add(
                             ScanResult(
-                                title = name.substringBeforeLast('.'),
+                                title = title.substringBeforeLast('.'),
+                                path = child.uri.toString(),
+                                itemType = LibraryItemType.EPUB,
+                                pageCount = null,
+                            )
+                        )
+                    }
+                    // MOBI/PRC
+                    child.isFile && isMobiFile(name, child.type) -> {
+                        val title = name ?: child.uri.lastPathSegment ?: "未命名 MOBI"
+                        results.add(
+                            ScanResult(
+                                title = title.substringBeforeLast('.'),
+                                path = child.uri.toString(),
+                                itemType = LibraryItemType.MOBI,
+                                pageCount = null,
+                            )
+                        )
+                    }
+                    // 压缩包 (ZIP/CBZ)
+                    child.isFile && isArchiveFile(name, child.type) -> {
+                        val title = name ?: child.uri.lastPathSegment ?: "未命名漫画"
+                        results.add(
+                            ScanResult(
+                                title = title.substringBeforeLast('.'),
                                 path = child.uri.toString(),
                                 itemType = LibraryItemType.ARCHIVE,
                                 pageCount = null, // 稍后按需计数
+                            )
+                        )
+                    }
+                    // RAR/CBR
+                    child.isFile && isRarFile(name, child.type) -> {
+                        val title = name ?: child.uri.lastPathSegment ?: "未命名 RAR"
+                        results.add(
+                            ScanResult(
+                                title = title.substringBeforeLast('.'),
+                                path = child.uri.toString(),
+                                itemType = LibraryItemType.ARCHIVE,
+                                pageCount = null,
                             )
                         )
                     }
@@ -122,16 +184,36 @@ class FileScanner @Inject constructor(
                 return@withContext null
             }
 
-            val name = file.name ?: return@withContext null
+            val name = file.name
+            val mimeType = context.contentResolver.getType(fileUri)
+            val title = name ?: fileUri.lastPathSegment ?: "未命名文件"
 
             when {
-                isArchiveFile(name) -> ScanResult(
-                    title = name.substringBeforeLast('.'),
+                isEbookFile(name, mimeType) -> ScanResult(
+                    title = title.substringBeforeLast('.'),
+                    path = fileUri.toString(),
+                    itemType = LibraryItemType.EPUB,
+                    pageCount = null,
+                )
+                isMobiFile(name, mimeType) -> ScanResult(
+                    title = title.substringBeforeLast('.'),
+                    path = fileUri.toString(),
+                    itemType = LibraryItemType.MOBI,
+                    pageCount = null,
+                )
+                isArchiveFile(name, mimeType) -> ScanResult(
+                    title = title.substringBeforeLast('.'),
                     path = fileUri.toString(),
                     itemType = LibraryItemType.ARCHIVE,
                     pageCount = null,
                 )
-                ImageFileUtils.isImageFile(name) -> {
+                isRarFile(name, mimeType) -> ScanResult(
+                    title = title.substringBeforeLast('.'),
+                    path = fileUri.toString(),
+                    itemType = LibraryItemType.ARCHIVE,
+                    pageCount = null,
+                )
+                name != null && ImageFileUtils.isImageFile(name) -> {
                     Timber.w("Single image file imported, treating as 1-page book: $name")
                     ScanResult(
                         title = name.substringBeforeLast('.'),
@@ -141,14 +223,35 @@ class FileScanner @Inject constructor(
                     )
                 }
                 else -> {
-                    Timber.w("Unsupported file type: $name")
+                    Timber.w("Unsupported file type: $name (mime: $mimeType)")
                     null
                 }
             }
         }
 
-    private fun isArchiveFile(name: String): Boolean {
-        val extension = name.substringAfterLast('.', "").lowercase()
-        return extension in ARCHIVE_EXTENSIONS
+    // ── Type detection helpers ──────────────────────────────────────
+
+    private fun isArchiveFile(name: String?, mimeType: String?): Boolean {
+        val ext = name?.substringAfterLast('.', "")?.lowercase()
+        if (ext in ARCHIVE_EXTENSIONS) return true
+        return mimeType in ARCHIVE_MIME_TYPES
+    }
+
+    private fun isRarFile(name: String?, mimeType: String?): Boolean {
+        val ext = name?.substringAfterLast('.', "")?.lowercase()
+        if (ext in RAR_EXTENSIONS) return true
+        return mimeType in RAR_MIME_TYPES
+    }
+
+    private fun isEbookFile(name: String?, mimeType: String?): Boolean {
+        val ext = name?.substringAfterLast('.', "")?.lowercase()
+        if (ext in EBOOK_EXTENSIONS) return true
+        return mimeType in EPUB_MIME_TYPES
+    }
+
+    private fun isMobiFile(name: String?, mimeType: String?): Boolean {
+        val ext = name?.substringAfterLast('.', "")?.lowercase()
+        if (ext in MOBI_EXTENSIONS) return true
+        return mimeType in MOBI_MIME_TYPES
     }
 }

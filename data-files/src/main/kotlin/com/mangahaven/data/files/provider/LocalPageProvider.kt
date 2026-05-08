@@ -26,6 +26,7 @@ class LocalPageProvider(
     private val folderReader by lazy { FolderContainerReader(context) }
     private val archiveReader by lazy { ArchiveContainerReader(context) }
     private val rarReader by lazy { com.mangahaven.data.files.container.RarArchiveContainerReader(context) }
+    private val mobiReader by lazy { com.mangahaven.data.files.container.MobiContainerReader(context) }
 
     private fun isRarArchive(path: String): Boolean {
         val lowerPath = path.lowercase()
@@ -46,6 +47,7 @@ class LocalPageProvider(
                         archiveReader.listPages(containerTarget)
                     }
                 }
+                LibraryItemType.MOBI -> mobiReader.listPages(containerTarget)
                 else -> emptyList()
             }
             pages = loadedPages
@@ -72,6 +74,10 @@ class LocalPageProvider(
                     } else {
                         archiveReader.openPageFromArchive(archiveUri, pageRef.path)
                     }
+                }
+                LibraryItemType.MOBI -> {
+                    val mobiUri = Uri.parse(containerTarget.path)
+                    mobiReader.openPageFromMobi(mobiUri, pageRef.index)
                 }
                 else -> throw IllegalStateException("Unsupported item type: ${containerTarget.itemType}")
             }

@@ -20,6 +20,7 @@ class ContainerReaderFactory @Inject constructor(
             LibraryItemType.FOLDER -> FolderContainerReader(context)
             LibraryItemType.ARCHIVE -> ArchiveContainerReader(context)
             LibraryItemType.EPUB -> EpubContainerReader(context)
+            LibraryItemType.MOBI -> MobiContainerReader(context)
             LibraryItemType.PDF -> PdfContainerReader(context)
             else -> throw IllegalArgumentException("Unsupported itemType: $itemType")
         }

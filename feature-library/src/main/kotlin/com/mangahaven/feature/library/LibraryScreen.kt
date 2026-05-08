@@ -162,10 +162,37 @@ fun LibraryScreen(
                         ExtendedFloatingActionButton(
                             onClick = {
                                 showImportMenu = false
-                                fileLauncher.launch(arrayOf("application/zip", "application/x-cbz-compressed", "application/octet-stream"))
+                                fileLauncher.launch(arrayOf(
+                                    "application/zip",
+                                    "application/x-cbz-compressed",
+                                    "application/x-zip-compressed",
+                                    "application/vnd.comicbook+zip",
+                                    "application/octet-stream"
+                                ))
                             },
                             icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
                             text = { Text("导入 ZIP/CBZ") },
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                showImportMenu = false
+                                fileLauncher.launch(arrayOf("application/epub+zip"))
+                            },
+                            icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
+                            text = { Text("导入 EPUB") },
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                showImportMenu = false
+                                fileLauncher.launch(arrayOf(
+                                    "application/x-mobipocket-ebook",
+                                    "application/x-mobi"
+                                ))
+                            },
+                            icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
+                            text = { Text("导入 MOBI") },
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         ExtendedFloatingActionButton(
