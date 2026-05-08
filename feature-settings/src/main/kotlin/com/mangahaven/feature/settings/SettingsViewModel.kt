@@ -178,16 +178,20 @@ class SettingsViewModel @Inject constructor(
     private fun loadLibraryStats() {
         viewModelScope.launch {
             try {
-                val dao = libraryRepository
-                val total = dao.count()
-                val unread = dao.countByStatus(ReadingStatus.UNREAD.name)
-                val reading = dao.countByStatus(ReadingStatus.READING.name)
-                val completed = dao.countByStatus(ReadingStatus.COMPLETED.name)
+                val repo = libraryRepository
+                val total = repo.count()
+                val unread = repo.countByStatus(ReadingStatus.UNREAD.name)
+                val reading = repo.countByStatus(ReadingStatus.READING.name)
+                val completed = repo.countByStatus(ReadingStatus.COMPLETED.name)
+                val favorites = repo.countFavorites()
+                val remote = repo.countRemoteItems()
                 _libraryStats.value = LibraryStats(
                     totalItems = total,
                     unreadCount = unread,
                     readingCount = reading,
                     completedCount = completed,
+                    favoriteCount = favorites,
+                    remoteCount = remote,
                 )
             } catch (e: Exception) {
                 Timber.e(e, "加载书库统计失败")

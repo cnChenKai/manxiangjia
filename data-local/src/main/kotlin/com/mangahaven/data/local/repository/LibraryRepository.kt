@@ -107,6 +107,11 @@ class LibraryRepository @Inject constructor(
      */
     suspend fun countFavorites(): Int = libraryItemDao.countFavorites()
 
+    /**
+     * 远程源条目数量。
+     */
+    suspend fun countRemoteItems(): Int = libraryItemDao.countRemoteItems()
+
     // --- Source 操作 ---
 
     /**

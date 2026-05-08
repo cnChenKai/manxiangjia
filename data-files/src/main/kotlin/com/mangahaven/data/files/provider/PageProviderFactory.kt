@@ -37,7 +37,7 @@ class PageProviderFactory @Inject constructor(
         val sourceEntity = sourceDao.getById(sourceId)
         val source = sourceEntity?.toModel()
 
-        return if (source != null && (source.type == SourceType.WEBDAV || source.type == SourceType.SMB)) {
+        return if (source != null && (source.type == SourceType.WEBDAV || source.type == SourceType.SMB || source.type == SourceType.OPDS)) {
             val client = sourceClientFactory.create(source)
 
             // 判断是否为远程压缩包文件

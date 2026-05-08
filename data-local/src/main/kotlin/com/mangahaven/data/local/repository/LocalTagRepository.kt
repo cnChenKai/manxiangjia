@@ -7,7 +7,6 @@ import com.mangahaven.model.Tag
 import com.mangahaven.model.TagRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import com.mangahaven.data.local.dao.TagDao
 
 /**
  * 标签仓库实现。

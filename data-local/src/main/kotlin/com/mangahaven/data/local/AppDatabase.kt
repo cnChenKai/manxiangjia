@@ -46,6 +46,8 @@ abstract class AppDatabase : RoomDatabase() {
         /** 从版本 4 升级到 5：新增标签表、关联表和快照表 */
         val MIGRATION_4_5 = object : Migration(4, 5) {
             override fun migrate(db: SupportSQLiteDatabase) {
+                // 给 sources 表添加 isVirtual 列
+                db.execSQL("ALTER TABLE `sources` ADD COLUMN `isVirtual` INTEGER NOT NULL DEFAULT 0")
                 // 创建标签表
                 db.execSQL("""
                     CREATE TABLE IF NOT EXISTS `tags` (

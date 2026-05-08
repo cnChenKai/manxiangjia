@@ -13,6 +13,7 @@ import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.File
 import java.io.FileOutputStream
+import java.io.IOException
 import java.security.MessageDigest
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -172,12 +173,14 @@ class RemoteArchiveCacheManager @Inject constructor(
                     // 最终进度
                     updateProgress(cacheKey, DownloadProgress(totalRead, totalRead, false))
 
-                    // 写入元数据
-                    writeMetaFile(metaFile, totalRead, remoteLastModified)
-
                     // 原子替换：先删旧文件再重命名
                     if (targetFile.exists()) targetFile.delete()
-                    tempFile.renameTo(targetFile)
+                    if (!tempFile.renameTo(targetFile)) {
+                        throw IOException("重命名临时文件失败: ${tempFile.absolutePath} -> ${targetFile.absolutePath}")
+                    }
+
+                    // 写入元数据（必须在重命名成功后）
+                    writeMetaFile(metaFile, totalRead, remoteLastModified)
 
                     Timber.d("远程压缩包下载完成: $remotePath ($totalRead 字节)")
                 }

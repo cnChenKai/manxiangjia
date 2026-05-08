@@ -5,6 +5,8 @@ import com.mangahaven.data.local.entity.SnapshotEntity
 import com.mangahaven.model.Snapshot
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -71,7 +73,7 @@ private fun Snapshot.toEntity(): SnapshotEntity = SnapshotEntity(
     path = path,
     title = title,
     normalizedTitle = normalizedTitle,
-    tagsJson = json.encodeToString(tags),
+    tagsJson = json.encodeToString<List<String>>(tags),
     pageCount = pageCount,
     updatedAt = updatedAt,
 )
