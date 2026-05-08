@@ -46,3 +46,6 @@ proguard/
 /patch_*.py
 /tmp_*.py
 /*_check.txt
+
+# Kotlin compiler sessions
+.kotlin/
