@@ -50,7 +50,7 @@ object ImageFileUtils {
      */
     fun isArchive(name: String): Boolean {
         val extension = name.substringAfterLast('.', "").lowercase()
-        return extension in setOf("zip", "cbz", "rar", "cbr", "epub", "mobi")
+        return extension in setOf("zip", "cbz", "rar", "cbr")
     }
 
     /**

@@ -31,7 +31,7 @@ class FileScanner @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) {
     companion object {
-        private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz", "rar", "cbr", "epub", "mobi")
+        private val ARCHIVE_EXTENSIONS = setOf("zip", "cbz", "rar", "cbr")
     }
 
     /**
@@ -94,25 +94,17 @@ class FileScanner @Inject constructor(
                             )
                         }
                     }
-
-                    // 压缩包或电子书
+                    // 压缩包
                     child.isFile && isArchiveFile(name) -> {
-                        val extension = name.substringAfterLast('.', "").lowercase()
-                        val itemType = when (extension) {
-                            "epub" -> LibraryItemType.EPUB
-                            "mobi" -> LibraryItemType.MOBI
-                            else -> LibraryItemType.ARCHIVE
-                        }
                         results.add(
                             ScanResult(
                                 title = name.substringBeforeLast('.'),
                                 path = child.uri.toString(),
-                                itemType = itemType,
+                                itemType = LibraryItemType.ARCHIVE,
                                 pageCount = null, // 稍后按需计数
                             )
                         )
                     }
-
                 }
             }
 
@@ -133,22 +125,12 @@ class FileScanner @Inject constructor(
             val name = file.name ?: return@withContext null
 
             when {
-
-                isArchiveFile(name) -> {
-                    val extension = name.substringAfterLast('.', "").lowercase()
-                    val itemType = when (extension) {
-                        "epub" -> LibraryItemType.EPUB
-                        "mobi" -> LibraryItemType.MOBI
-                        else -> LibraryItemType.ARCHIVE
-                    }
-                    ScanResult(
-                        title = name.substringBeforeLast('.'),
-                        path = fileUri.toString(),
-                        itemType = itemType,
-                        pageCount = null,
-                    )
-                }
-
+                isArchiveFile(name) -> ScanResult(
+                    title = name.substringBeforeLast('.'),
+                    path = fileUri.toString(),
+                    itemType = LibraryItemType.ARCHIVE,
+                    pageCount = null,
+                )
                 ImageFileUtils.isImageFile(name) -> {
                     Timber.w("Single image file imported, treating as 1-page book: $name")
                     ScanResult(
