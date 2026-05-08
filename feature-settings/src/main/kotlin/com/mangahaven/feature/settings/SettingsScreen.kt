@@ -42,6 +42,9 @@ fun SettingsScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
 
+    // 导入确认弹窗状态
+    var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
+
     // SAF 文件选择器：导出
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -49,11 +52,33 @@ fun SettingsScreen(
         uri?.let { viewModel.exportSettings(it) }
     }
 
-    // SAF 文件选择器：导入
+    // SAF 文件选择器：导入（选中文件后弹确认框）
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
-        uri?.let { viewModel.importSettings(it) }
+        pendingImportUri = uri
+    }
+
+    // 导入确认弹窗
+    if (pendingImportUri != null) {
+        AlertDialog(
+            onDismissRequest = { pendingImportUri = null },
+            title = { Text("确认导入设置") },
+            text = { Text("导入后将覆盖当前阅读偏好和应用设置，并新增或更新远程源配置。是否继续？") },
+            confirmButton = {
+                TextButton(onClick = {
+                    pendingImportUri?.let { viewModel.importSettings(it) }
+                    pendingImportUri = null
+                }) {
+                    Text("确认导入")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingImportUri = null }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 
     // 显示操作结果
@@ -136,7 +161,7 @@ fun SettingsScreen(
             )
             SettingsClickableItem(
                 title = "一键导出设置",
-                subtitle = "导出阅读偏好和远程源配置（含 WebDAV 服务器信息）到 JSON 文件",
+                subtitle = "导出阅读偏好和远程源（WebDAV/SMB）配置到 JSON 文件",
                 onClick = {
                     val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                     exportLauncher.launch("mangahaven_backup_$timestamp.json")

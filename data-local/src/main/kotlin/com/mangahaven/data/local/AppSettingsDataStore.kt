@@ -14,12 +14,20 @@ import javax.inject.Singleton
 private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 
 /**
+ * 应用设置 DataStore 接口。
+ */
+interface IAppSettingsDataStore {
+    val privacyLockEnabledFlow: Flow<Boolean>
+    suspend fun setPrivacyLockEnabled(enabled: Boolean)
+}
+
+/**
  * DataStore 包装类，用于持久化 APP 级别的配置（例如应用锁）。
  */
 @Singleton
 class AppSettingsDataStore @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
-) {
+) : IAppSettingsDataStore {
     private object Keys {
         val PRIVACY_LOCK_ENABLED = booleanPreferencesKey("privacy_lock_enabled")
     }
@@ -27,14 +35,14 @@ class AppSettingsDataStore @Inject constructor(
     /**
      * 隐私锁配置流。
      */
-    val privacyLockEnabledFlow: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+    override val privacyLockEnabledFlow: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
         prefs[Keys.PRIVACY_LOCK_ENABLED] ?: false
     }
 
     /**
      * 更新隐私锁配置。
      */
-    suspend fun setPrivacyLockEnabled(enabled: Boolean) {
+    override suspend fun setPrivacyLockEnabled(enabled: Boolean) {
         context.appSettingsDataStore.edit { prefs ->
             prefs[Keys.PRIVACY_LOCK_ENABLED] = enabled
         }

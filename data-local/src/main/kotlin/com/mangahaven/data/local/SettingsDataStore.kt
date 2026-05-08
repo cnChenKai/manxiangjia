@@ -20,12 +20,20 @@ private val Context.settingsDataStore: DataStore<Preferences> by preferencesData
 )
 
 /**
+ * 阅读设置 DataStore 接口。
+ */
+interface ISettingsDataStore {
+    val settingsFlow: Flow<ReaderSettings>
+    suspend fun updateSettings(settings: ReaderSettings)
+}
+
+/**
  * DataStore 包装类，用于持久化全局阅读设置。
  */
 @Singleton
 class SettingsDataStore @Inject constructor(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
-) {
+) : ISettingsDataStore {
     private object Keys {
         val READING_MODE = stringPreferencesKey("reading_mode")
         val ENABLE_CROP = booleanPreferencesKey("enable_crop")
@@ -39,7 +47,7 @@ class SettingsDataStore @Inject constructor(
     /**
      * 观察阅读设置变化。
      */
-    val settingsFlow: Flow<ReaderSettings> = context.settingsDataStore.data.map { prefs ->
+    override val settingsFlow: Flow<ReaderSettings> = context.settingsDataStore.data.map { prefs ->
         ReaderSettings(
             readingMode = prefs[Keys.READING_MODE]?.let {
                 runCatching { ReadingMode.valueOf(it) }.getOrNull()
@@ -58,7 +66,7 @@ class SettingsDataStore @Inject constructor(
     /**
      * 更新阅读设置。
      */
-    suspend fun updateSettings(settings: ReaderSettings) {
+    override suspend fun updateSettings(settings: ReaderSettings) {
         context.settingsDataStore.edit { prefs ->
             prefs[Keys.READING_MODE] = settings.readingMode.name
             prefs[Keys.ENABLE_CROP] = settings.enableCrop

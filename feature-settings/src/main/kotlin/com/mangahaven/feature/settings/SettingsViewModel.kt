@@ -102,7 +102,9 @@ class SettingsViewModel @Inject constructor(
             try {
                 val json = backupManager.exportToJson()
                 withContext(Dispatchers.IO) {
-                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                    val output = context.contentResolver.openOutputStream(uri)
+                        ?: throw IllegalStateException("无法打开导出文件")
+                    output.use { os ->
                         os.write(json.toByteArray(Charsets.UTF_8))
                     }
                 }
@@ -121,12 +123,12 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val json = withContext(Dispatchers.IO) {
-                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-                        ?.toString(Charsets.UTF_8)
+                    val input = context.contentResolver.openInputStream(uri)
                         ?: throw IllegalStateException("无法读取文件")
+                    input.use { it.readBytes().toString(Charsets.UTF_8) }
                 }
-                val sourceCount = backupManager.importFromJson(json)
-                _backupMessage.value = "导入成功（含 $sourceCount 个远程源）"
+                val result = backupManager.importFromJson(json)
+                _backupMessage.value = "导入成功：新增 ${result.insertedSources} 个远程源，更新 ${result.updatedSources} 个远程源"
             } catch (e: Exception) {
                 Timber.e(e, "导入设置失败")
                 _backupMessage.value = "导入失败: ${e.message}"

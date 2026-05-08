@@ -21,3 +21,11 @@ data class SettingsExportData(
 data class AppSettings(
     val privacyLockEnabled: Boolean = false,
 )
+
+/**
+ * 导入结果。
+ */
+data class SettingsImportResult(
+    val insertedSources: Int,
+    val updatedSources: Int,
+)

@@ -3,6 +3,9 @@ package com.mangahaven.data.local.di
 import android.content.Context
 import androidx.room.Room
 import com.mangahaven.data.local.AppDatabase
+import com.mangahaven.data.local.AppSettingsDataStore
+import com.mangahaven.data.local.IAppSettingsDataStore
+import com.mangahaven.data.local.ISettingsDataStore
 import com.mangahaven.data.local.SettingsDataStore
 import com.mangahaven.data.local.dao.ItemSettingsDao
 import com.mangahaven.data.local.dao.LibraryItemDao
@@ -63,4 +66,12 @@ object DatabaseModule {
     ): SettingsDataStore {
         return SettingsDataStore(context)
     }
+
+    @Provides
+    @Singleton
+    fun provideISettingsDataStore(impl: SettingsDataStore): ISettingsDataStore = impl
+
+    @Provides
+    @Singleton
+    fun provideIAppSettingsDataStore(impl: AppSettingsDataStore): IAppSettingsDataStore = impl
 }
