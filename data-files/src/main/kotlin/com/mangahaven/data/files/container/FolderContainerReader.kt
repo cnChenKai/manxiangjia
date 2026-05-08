@@ -2,6 +2,7 @@ package com.mangahaven.data.files.container
 
 import android.content.Context
 import android.net.Uri
+import android.provider.DocumentsContract
 import androidx.documentfile.provider.DocumentFile
 import com.mangahaven.data.files.ContainerReader
 import com.mangahaven.model.ContainerTarget
@@ -19,34 +20,79 @@ class FolderContainerReader(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) : ContainerReader {
 
-    override suspend fun listPages(target: ContainerTarget): List<PageRef> =
+override suspend fun listPages(target: ContainerTarget): List<PageRef> =
         withContext(Dispatchers.IO) {
             val uri = Uri.parse(target.path)
-            val documentFile = DocumentFile.fromTreeUri(context, uri)
-            if (documentFile == null || !documentFile.exists()) {
-                Timber.e("Directory not found: ${target.path}")
-                return@withContext emptyList()
-            }
 
-            val imageFiles = documentFile.listFiles()
-                .filter { file ->
-                    file.isFile &&
-                    file.name != null &&
-                    ImageFileUtils.isImageFile(file.name!!) &&
-                    !ImageFileUtils.shouldIgnore(file.name!!)
+            try {
+                // Determine if it's a tree URI or a document URI
+                val isDocumentUri = DocumentsContract.isDocumentUri(context, uri)
+                val documentId = if (isDocumentUri) {
+                    DocumentsContract.getDocumentId(uri)
+                } else {
+                    DocumentsContract.getTreeDocumentId(uri)
                 }
-                .sortedWith(compareBy(ImageFileUtils.naturalOrderComparator) { it.name ?: "" })
 
-            imageFiles.mapIndexed { index, file ->
-                PageRef(
-                    index = index,
-                    name = file.name ?: "page_$index",
-                    path = file.uri.toString(),
-                    mimeType = ImageFileUtils.getMimeType(file.name ?: ""),
-                    sizeBytes = file.length(),
-                )
+                val childrenUri = DocumentsContract.buildChildDocumentsUriUsingTree(uri, documentId)
+
+                val imageFiles = mutableListOf<DocumentFileInfo>()
+
+                context.contentResolver.query(
+                    childrenUri,
+                    arrayOf(
+                        DocumentsContract.Document.COLUMN_DOCUMENT_ID,
+                        DocumentsContract.Document.COLUMN_DISPLAY_NAME,
+                        DocumentsContract.Document.COLUMN_MIME_TYPE,
+                        DocumentsContract.Document.COLUMN_SIZE
+                    ),
+                    null,
+                    null,
+                    null
+                )?.use { cursor ->
+                    val idIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DOCUMENT_ID)
+                    val nameIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_DISPLAY_NAME)
+                    val mimeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_MIME_TYPE)
+                    val sizeIndex = cursor.getColumnIndexOrThrow(DocumentsContract.Document.COLUMN_SIZE)
+
+                    while (cursor.moveToNext()) {
+                        val childDocId = cursor.getString(idIndex)
+                        val name = cursor.getString(nameIndex)
+                        val mimeType = cursor.getString(mimeIndex)
+                        val size = if (!cursor.isNull(sizeIndex)) cursor.getLong(sizeIndex) else 0L
+
+                        // skip directories based on mime type
+                        if (mimeType == DocumentsContract.Document.MIME_TYPE_DIR) continue
+
+                        if (name != null && ImageFileUtils.isImageFile(name) && !ImageFileUtils.shouldIgnore(name)) {
+                            val childUri = DocumentsContract.buildDocumentUriUsingTree(uri, childDocId)
+                            imageFiles.add(DocumentFileInfo(name, childUri.toString(), mimeType, size))
+                        }
+                    }
+                }
+
+                val sortedFiles = imageFiles.sortedWith(compareBy(ImageFileUtils.naturalOrderComparator) { it.name })
+
+                sortedFiles.mapIndexed { index, fileInfo ->
+                    PageRef(
+                        index = index,
+                        name = fileInfo.name,
+                        path = fileInfo.uriStr,
+                        mimeType = ImageFileUtils.getMimeType(fileInfo.name) ?: fileInfo.mimeType,
+                        sizeBytes = fileInfo.size,
+                    )
+                }
+            } catch (e: Exception) {
+                Timber.e(e, "Failed to list pages for directory: ${target.path}")
+                emptyList()
             }
         }
+
+    private data class DocumentFileInfo(
+        val name: String,
+        val uriStr: String,
+        val mimeType: String?,
+        val size: Long
+    )
 
     override suspend fun openPage(pageRef: PageRef): InputStream =
         withContext(Dispatchers.IO) {

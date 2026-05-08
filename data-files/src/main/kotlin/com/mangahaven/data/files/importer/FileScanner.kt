@@ -70,10 +70,10 @@ class FileScanner @Inject constructor(
                 return@withContext results
             }
 
-            // 扫描子项
+// 扫描子项
             for (child in children) {
-                val name = child.name ?: continue
-                if (ImageFileUtils.shouldIgnore(name)) continue
+                val name = child.name
+                if (name != null && ImageFileUtils.shouldIgnore(name)) continue
 
                 when {
                     // 子目录：检查是否包含图片
@@ -86,7 +86,7 @@ class FileScanner @Inject constructor(
                         if (subImages > 0) {
                             results.add(
                                 ScanResult(
-                                    title = name,
+                                    title = name ?: child.uri.lastPathSegment ?: "未命名目录",
                                     path = child.uri.toString(),
                                     itemType = LibraryItemType.FOLDER,
                                     pageCount = subImages,
@@ -94,11 +94,12 @@ class FileScanner @Inject constructor(
                             )
                         }
                     }
-                    // 压缩包
-                    child.isFile && isArchiveFile(name) -> {
+// 压缩包
+                    child.isFile && isArchiveFile(name, child.type) -> {
+                        val title = name ?: child.uri.lastPathSegment ?: "未命名漫画"
                         results.add(
                             ScanResult(
-                                title = name.substringBeforeLast('.'),
+                                title = title.substringBeforeLast('.'),
                                 path = child.uri.toString(),
                                 itemType = LibraryItemType.ARCHIVE,
                                 pageCount = null, // 稍后按需计数
@@ -122,16 +123,18 @@ class FileScanner @Inject constructor(
                 return@withContext null
             }
 
-            val name = file.name ?: return@withContext null
+val name = file.name
+            val mimeType = context.contentResolver.getType(fileUri)
+            val title = name ?: fileUri.lastPathSegment ?: "未命名漫画"
 
             when {
-                isArchiveFile(name) -> ScanResult(
-                    title = name.substringBeforeLast('.'),
+                isArchiveFile(name, mimeType) -> ScanResult(
+                    title = title.substringBeforeLast('.'),
                     path = fileUri.toString(),
                     itemType = LibraryItemType.ARCHIVE,
                     pageCount = null,
                 )
-                ImageFileUtils.isImageFile(name) -> {
+                name != null && ImageFileUtils.isImageFile(name) -> {
                     Timber.w("Single image file imported, treating as 1-page book: $name")
                     ScanResult(
                         title = name.substringBeforeLast('.'),
@@ -147,8 +150,21 @@ class FileScanner @Inject constructor(
             }
         }
 
-    private fun isArchiveFile(name: String): Boolean {
-        val extension = name.substringAfterLast('.', "").lowercase()
-        return extension in ARCHIVE_EXTENSIONS
+private fun isArchiveFile(name: String?, mimeType: String?): Boolean {
+        val ext = name
+            ?.substringAfterLast('.', "")
+            ?.lowercase()
+
+        if (ext in ARCHIVE_EXTENSIONS) return true
+
+        return mimeType in setOf(
+            "application/zip",
+            "application/x-zip-compressed",
+            "application/x-cbz-compressed",
+            "application/vnd.comicbook+zip",
+            "application/x-cbr",
+            "application/vnd.comicbook-rar",
+            "application/octet-stream"
+        )
     }
 }

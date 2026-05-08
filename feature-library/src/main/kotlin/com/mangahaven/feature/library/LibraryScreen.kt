@@ -162,7 +162,7 @@ fun LibraryScreen(
                         ExtendedFloatingActionButton(
                             onClick = {
                                 showImportMenu = false
-                                fileLauncher.launch(arrayOf("application/zip", "application/x-cbz-compressed", "application/octet-stream"))
+                                fileLauncher.launch(arrayOf("*/*"))
                             },
                             icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
                             text = { Text("导入 ZIP/CBZ") },
