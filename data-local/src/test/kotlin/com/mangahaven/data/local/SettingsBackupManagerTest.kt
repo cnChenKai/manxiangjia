@@ -133,6 +133,24 @@ class SettingsBackupManagerTest {
     // --- Import: 去重逻辑 ---
 
     @Test
+    fun `import ignores LOCAL and SAF_TREE sources`() = runTest {
+        val data = SettingsExportData(
+            sources = listOf(
+                Source("1", SourceType.WEBDAV, "DAV", "http://d.com", null),
+                Source("2", SourceType.LOCAL, "Local", "/sdcard", null),
+                Source("3", SourceType.SAF_TREE, "SAF", "content://tree/1", null),
+                Source("4", SourceType.SMB, "SMB", "192.168.1.1", null),
+            )
+        )
+
+        val result = manager.importFromJson(json.encodeToString(data))
+
+        // 只有 WEBDAV 和 SMB 被导入
+        assertEquals(2, result.insertedSources)
+        assertEquals(0, result.updatedSources)
+    }
+
+    @Test
     fun `import inserts new sources`() = runTest {
         val data = SettingsExportData(
             sources = listOf(

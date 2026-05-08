@@ -161,7 +161,7 @@ fun SettingsScreen(
             )
             SettingsClickableItem(
                 title = "一键导出设置",
-                subtitle = "导出阅读偏好和远程源（WebDAV/SMB）配置到 JSON 文件",
+                subtitle = "导出阅读偏好和远程源（WebDAV/SMB/OPDS）配置到 JSON 文件",
                 onClick = {
                     val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
                     exportLauncher.launch("mangahaven_backup_$timestamp.json")

@@ -72,7 +72,8 @@ class SettingsBackupManager @Inject constructor(
         var inserted = 0
         var updated = 0
 
-        for (source in data.sources) {
+        // 只处理可迁移的远程源，忽略 LOCAL/SAF_TREE
+        for (source in data.sources.filter { isMigratable(it.type) }) {
             val existing = sourceDao.findByTypeAndConfig(source.type.name, source.configJson)
             if (existing != null) {
                 // 已存在同类型同配置的源，保留原 id 更新
