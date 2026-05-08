@@ -1,5 +1,11 @@
 package com.mangahaven.feature.settings
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -10,19 +16,17 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mangahaven.model.ReadingMode
-import androidx.compose.ui.platform.LocalContext
 import com.mangahaven.data.files.remote.CrashUploader
+import com.mangahaven.model.ReadingMode
 import kotlinx.coroutines.launch
 import java.io.File
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -33,8 +37,35 @@ fun SettingsScreen(
     val privacyLockEnabled by viewModel.privacyLockEnabled.collectAsStateWithLifecycle()
     val readerSettings by viewModel.readerSettings.collectAsStateWithLifecycle()
     val cacheSize by viewModel.cacheSize.collectAsStateWithLifecycle()
+    val backupMessage by viewModel.backupMessage.collectAsStateWithLifecycle()
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    val context = LocalContext.current
+
+    // SAF 文件选择器：导出
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        uri?.let { viewModel.exportSettings(it) }
+    }
+
+    // SAF 文件选择器：导入
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        uri?.let { viewModel.importSettings(it) }
+    }
+
+    // 显示操作结果
+    LaunchedEffect(backupMessage) {
+        backupMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearBackupMessage()
+        }
+    }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
                 title = { Text("设置") },
@@ -103,10 +134,22 @@ fun SettingsScreen(
                 subtitle = "当前缓存: $cacheSize",
                 onClick = viewModel::clearCache
             )
+            SettingsClickableItem(
+                title = "一键导出设置",
+                subtitle = "导出阅读偏好和远程源配置（含 WebDAV 服务器信息）到 JSON 文件",
+                onClick = {
+                    val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
+                    exportLauncher.launch("mangahaven_backup_$timestamp.json")
+                }
+            )
+            SettingsClickableItem(
+                title = "一键导入设置",
+                subtitle = "从之前导出的 JSON 文件恢复设置和远程源",
+                onClick = { importLauncher.launch(arrayOf("application/json")) }
+            )
             
 
             SettingsCategoryTitle(title = "开发者选项")
-            val context = LocalContext.current
             val coroutineScope = rememberCoroutineScope()
             var isUploading by remember { mutableStateOf(false) }
 

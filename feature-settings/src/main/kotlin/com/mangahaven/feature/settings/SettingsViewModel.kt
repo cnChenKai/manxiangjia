@@ -1,11 +1,13 @@
 package com.mangahaven.feature.settings
 
 import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
 import com.mangahaven.data.files.thumbnail.ThumbnailGenerator
 import com.mangahaven.data.local.AppSettingsDataStore
+import com.mangahaven.data.local.SettingsBackupManager
 import com.mangahaven.data.local.SettingsDataStore
 import com.mangahaven.data.local.cover.CoverManager
 import com.mangahaven.model.ReaderSettings
@@ -20,6 +22,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
@@ -29,11 +32,19 @@ class SettingsViewModel @Inject constructor(
     private val settingsDataStore: SettingsDataStore,
     private val coverManager: CoverManager,
     private val thumbnailGenerator: ThumbnailGenerator,
+    private val backupManager: SettingsBackupManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _cacheSize = MutableStateFlow("0 MB")
     val cacheSize: StateFlow<String> = _cacheSize.asStateFlow()
+
+    private val _backupMessage = MutableStateFlow<String?>(null)
+    val backupMessage: StateFlow<String?> = _backupMessage.asStateFlow()
+
+    fun clearBackupMessage() {
+        _backupMessage.value = null
+    }
 
     init {
         updateCacheSize()
@@ -81,6 +92,46 @@ class SettingsViewModel @Inject constructor(
 
     fun toggleKeepScreenOn(enabled: Boolean) {
         viewModelScope.launch { settingsDataStore.updateSettings(readerSettings.value.copy(keepScreenOn = enabled)) }
+    }
+
+    /**
+     * 导出设置到指定 URI。
+     */
+    fun exportSettings(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val json = backupManager.exportToJson()
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { os ->
+                        os.write(json.toByteArray(Charsets.UTF_8))
+                    }
+                }
+                _backupMessage.value = "设置已导出"
+            } catch (e: Exception) {
+                Timber.e(e, "导出设置失败")
+                _backupMessage.value = "导出失败: ${e.message}"
+            }
+        }
+    }
+
+    /**
+     * 从指定 URI 导入设置。
+     */
+    fun importSettings(uri: Uri) {
+        viewModelScope.launch {
+            try {
+                val json = withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                        ?.toString(Charsets.UTF_8)
+                        ?: throw IllegalStateException("无法读取文件")
+                }
+                val sourceCount = backupManager.importFromJson(json)
+                _backupMessage.value = "导入成功（含 $sourceCount 个远程源）"
+            } catch (e: Exception) {
+                Timber.e(e, "导入设置失败")
+                _backupMessage.value = "导入失败: ${e.message}"
+            }
+        }
     }
 
     fun clearCache() {

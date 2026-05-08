@@ -43,6 +43,7 @@ dependencies {
     debugImplementation(libs.compose.ui.tooling)
 
     // AndroidX
+    implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
 

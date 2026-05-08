@@ -32,4 +32,7 @@ interface SourceDao {
 
     @Query("DELETE FROM sources WHERE id = :id")
     suspend fun deleteById(id: String)
+
+    @Query("SELECT * FROM sources")
+    suspend fun getAll(): List<SourceEntity>
 }
