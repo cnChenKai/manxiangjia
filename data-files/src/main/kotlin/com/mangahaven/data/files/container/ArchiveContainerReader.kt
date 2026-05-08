@@ -20,16 +20,21 @@ import java.util.zip.ZipInputStream
  * 不做全量解压，按需读取。
  */
 class ArchiveContainerReader(
-    @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
+    private val context: Context?,
+    private val openInputStreamOverride: ((String) -> InputStream?)? = null
 ) : ContainerReader {
+
+    @javax.inject.Inject
+    constructor(@dagger.hilt.android.qualifiers.ApplicationContext context: Context) : this(context, null)
+
 
     override suspend fun listPages(target: ContainerTarget): List<PageRef> =
         withContext(Dispatchers.IO) {
-            val uri = Uri.parse(target.path)
+
             val entries = mutableListOf<ZipEntryInfo>()
 
             try {
-                context.contentResolver.openInputStream(uri)?.use { rawStream ->
+                (openInputStreamOverride?.invoke(target.path) ?: context?.contentResolver?.openInputStream(Uri.parse(target.path)))?.use { rawStream ->
                     ZipInputStream(rawStream).use { zis ->
                         var entry: ZipEntry? = zis.nextEntry
                         while (entry != null) {
@@ -88,7 +93,7 @@ class ArchiveContainerReader(
      */
     suspend fun openPageFromArchive(archiveUri: Uri, entryPath: String): InputStream =
         withContext(Dispatchers.IO) {
-            context.contentResolver.openInputStream(archiveUri)?.use { rawStream ->
+            (openInputStreamOverride?.invoke(archiveUri.toString()) ?: context?.contentResolver?.openInputStream(archiveUri))?.use { rawStream ->
                 ZipInputStream(rawStream).use { zis ->
                     var entry: ZipEntry? = zis.nextEntry
                     while (entry != null) {
@@ -110,8 +115,8 @@ class ArchiveContainerReader(
             try {
                 val pages = listPages(target)
                 if (pages.isNotEmpty()) {
-                    val uri = Uri.parse(target.path)
-                    openPageFromArchive(uri, pages.first().path)
+
+                    openPageFromArchive(Uri.parse(target.path), pages.first().path)
                 } else {
                     null
                 }

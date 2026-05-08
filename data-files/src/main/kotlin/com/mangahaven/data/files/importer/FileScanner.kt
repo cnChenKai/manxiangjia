@@ -163,8 +163,7 @@ private fun isArchiveFile(name: String?, mimeType: String?): Boolean {
             "application/x-cbz-compressed",
             "application/vnd.comicbook+zip",
             "application/x-cbr",
-            "application/vnd.comicbook-rar",
-            "application/octet-stream"
+            "application/vnd.comicbook-rar"
         )
     }
 }
