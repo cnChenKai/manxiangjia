@@ -22,9 +22,22 @@ fun SourceConfigDialog(
     var username by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
 
+    val titleText = when (sourceType) {
+        SourceType.WEBDAV -> "添加 WebDAV 源"
+        SourceType.SMB -> "添加 SMB 源"
+        SourceType.OPDS -> "添加 OPDS 源"
+        else -> "添加内容源"
+    }
+
+    val urlLabel = when (sourceType) {
+        SourceType.WEBDAV -> "URL (例如: http://192.168.1.5:8080/)"
+        SourceType.OPDS -> "OPDS URL (例如: http://opds.example.com/catalog)"
+        else -> "IP或主机名 (例如: 192.168.1.5)"
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = if (sourceType == SourceType.WEBDAV) "添加 WebDAV 源" else "添加 SMB 源") },
+        title = { Text(text = titleText) },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -40,7 +53,7 @@ fun SourceConfigDialog(
                 OutlinedTextField(
                     value = urlOrIp,
                     onValueChange = { urlOrIp = it },
-                    label = { Text(if (sourceType == SourceType.WEBDAV) "URL (例如: http://192.168.1.5:8080/)" else "IP或主机名 (例如: 192.168.1.5)") },
+                    label = { Text(urlLabel) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -53,42 +66,49 @@ fun SourceConfigDialog(
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
-                OutlinedTextField(
-                    value = username,
-                    onValueChange = { username = it },
-                    label = { Text("用户名 (可选)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("密码 (可选)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                // OPDS 源通常不需要认证，但保留可选认证字段
+                if (sourceType != SourceType.OPDS) {
+                    OutlinedTextField(
+                        value = username,
+                        onValueChange = { username = it },
+                        label = { Text("用户名 (可选)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = { password = it },
+                        label = { Text("密码 (可选)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
         },
         confirmButton = {
             TextButton(
                 onClick = {
                     if (name.isNotBlank() && urlOrIp.isNotBlank()) {
-                        val authRef = if (username.isNotBlank() && password.isNotBlank()) {
+                        val authRef = if (sourceType != SourceType.OPDS && username.isNotBlank() && password.isNotBlank()) {
                             if (sourceType == SourceType.SMB && domain.isNotBlank()) {
                                 "$domain;$username:$password"
                             } else {
                                 "$username:$password"
                             }
                         } else null
-                        
+
+                        // OPDS 源标记为虚拟源，不缓存本地文件
+                        val isVirtual = sourceType == SourceType.OPDS
+
                         val newSource = Source(
                             id = UUID.randomUUID().toString(),
                             type = sourceType,
                             name = name,
                             configJson = urlOrIp,
                             authRef = authRef,
-                            isWritable = true,
-                            lastSyncAt = null
+                            isWritable = false,
+                            lastSyncAt = null,
+                            isVirtual = isVirtual,
                         )
                         onSave(newSource)
                     }

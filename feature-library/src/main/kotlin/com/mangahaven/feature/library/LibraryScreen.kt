@@ -3,26 +3,35 @@ package com.mangahaven.feature.library
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CreateNewFolder
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.InsertDriveFile
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Circle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -56,8 +65,12 @@ fun LibraryScreen(
     val searchQuery by viewModel.searchQuery.collectAsStateWithLifecycle()
     val statusFilter by viewModel.statusFilter.collectAsStateWithLifecycle()
     val isFavoriteFilter by viewModel.isFavoriteFilter.collectAsStateWithLifecycle()
+    val sortBy by viewModel.sortBy.collectAsStateWithLifecycle()
+    val isMultiSelectMode by viewModel.isMultiSelectMode.collectAsStateWithLifecycle()
+    val selectedIds by viewModel.selectedIds.collectAsStateWithLifecycle()
 
     var showImportMenu by remember { mutableStateOf(false) }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
 
     // File Picker
     val fileLauncher = rememberLauncherForActivityResult(
@@ -73,53 +86,106 @@ fun LibraryScreen(
         uri?.let { viewModel.importDirectory(it) }
     }
 
+    // 删除确认弹窗
+    if (showDeleteConfirm) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            title = { Text("确认删除") },
+            text = { Text("确定要删除选中的 ${selectedIds.size} 个条目吗？此操作不可撤销。") },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.batchDelete()
+                    showDeleteConfirm = false
+                }) {
+                    Text("删除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirm = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("漫享家 / MangaHaven") },
-                actions = {
-                    IconButton(onClick = { viewModel.sortBy.value = if (viewModel.sortBy.value == "TITLE") "RECENT_READ" else "TITLE" }) {
-                        Icon(Icons.Default.Settings, contentDescription = "排序")
-                    }
-                    IconButton(onClick = onNavigateToSources) {
-                        Icon(Icons.Default.CloudQueue, contentDescription = "远程源")
-                    }
-                    IconButton(onClick = onNavigateToSettings) {
-                        Icon(Icons.Default.Settings, contentDescription = "设置")
-                    }
-                },
-                scrollBehavior = scrollBehavior
-            )
+            if (isMultiSelectMode) {
+                // 多选模式工具栏
+                TopAppBar(
+                    title = { Text("已选 ${selectedIds.size} 项") },
+                    navigationIcon = {
+                        IconButton(onClick = { viewModel.exitMultiSelect() }) {
+                            Icon(Icons.Default.Close, contentDescription = "取消选择")
+                        }
+                    },
+                    actions = {
+                        IconButton(onClick = { viewModel.toggleSelectAll() }) {
+                            Icon(Icons.Default.SelectAll, contentDescription = "全选")
+                        }
+                        IconButton(onClick = { viewModel.batchMarkAsRead() }) {
+                            Icon(Icons.Default.CheckCircle, contentDescription = "标记已读")
+                        }
+                        IconButton(onClick = { viewModel.batchToggleFavorite() }) {
+                            Icon(Icons.Default.Star, contentDescription = "切换收藏")
+                        }
+                        IconButton(onClick = { showDeleteConfirm = true }) {
+                            Icon(Icons.Default.Delete, contentDescription = "删除", tint = MaterialTheme.colorScheme.error)
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                )
+            } else {
+                TopAppBar(
+                    title = { Text("漫享家 / MangaHaven") },
+                    actions = {
+                        IconButton(onClick = { viewModel.updateSortBy(if (sortBy == "TITLE") "RECENT_READ" else "TITLE") }) {
+                            Icon(Icons.Default.Settings, contentDescription = "排序")
+                        }
+                        IconButton(onClick = onNavigateToSources) {
+                            Icon(Icons.Default.CloudQueue, contentDescription = "远程源")
+                        }
+                        IconButton(onClick = onNavigateToSettings) {
+                            Icon(Icons.Default.Settings, contentDescription = "设置")
+                        }
+                    },
+                    scrollBehavior = scrollBehavior
+                )
+            }
         },
         floatingActionButton = {
-            Column(horizontalAlignment = Alignment.End) {
-                if (showImportMenu) {
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            showImportMenu = false
-                            fileLauncher.launch(arrayOf("application/zip", "application/x-cbz-compressed", "application/octet-stream"))
-                        },
-                        icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
-                        text = { Text("导入 ZIP/CBZ") },
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
-                    ExtendedFloatingActionButton(
-                        onClick = {
-                            showImportMenu = false
-                            dirLauncher.launch(null)
-                        },
-                        icon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null) },
-                        text = { Text("导入漫画文件夹") },
-                        modifier = Modifier.padding(bottom = 16.dp)
-                    )
-                }
+            if (!isMultiSelectMode) {
+                Column(horizontalAlignment = Alignment.End) {
+                    if (showImportMenu) {
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                showImportMenu = false
+                                fileLauncher.launch(arrayOf("application/zip", "application/x-cbz-compressed", "application/octet-stream"))
+                            },
+                            icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
+                            text = { Text("导入 ZIP/CBZ") },
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+                        ExtendedFloatingActionButton(
+                            onClick = {
+                                showImportMenu = false
+                                dirLauncher.launch(null)
+                            },
+                            icon = { Icon(Icons.Default.CreateNewFolder, contentDescription = null) },
+                            text = { Text("导入漫画文件夹") },
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
 
-                FloatingActionButton(
-                    onClick = { showImportMenu = !showImportMenu },
-                    containerColor = MaterialTheme.colorScheme.primaryContainer,
-                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "导入本地漫画")
+                    FloatingActionButton(
+                        onClick = { showImportMenu = !showImportMenu },
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "导入本地漫画")
+                    }
                 }
             }
         }
@@ -135,7 +201,7 @@ fun LibraryScreen(
                 // Search & Filter Header
                 OutlinedTextField(
                     value = searchQuery,
-                    onValueChange = { viewModel.searchQuery.value = it },
+                    onValueChange = { viewModel.updateSearchQuery(it) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -152,7 +218,7 @@ fun LibraryScreen(
                     item {
                         FilterChip(
                             selected = isFavoriteFilter == true,
-                            onClick = { viewModel.isFavoriteFilter.value = if (isFavoriteFilter == true) null else true },
+                            onClick = { viewModel.updateFavoriteFilter(if (isFavoriteFilter == true) null else true) },
                             label = { Text("收藏") },
                             leadingIcon = { if (isFavoriteFilter == true) Icon(Icons.Default.Star, null, Modifier.size(18.dp)) }
                         )
@@ -160,21 +226,21 @@ fun LibraryScreen(
                     item {
                         FilterChip(
                             selected = statusFilter == ReadingStatus.UNREAD.name,
-                            onClick = { viewModel.statusFilter.value = if (statusFilter == ReadingStatus.UNREAD.name) null else ReadingStatus.UNREAD.name },
+                            onClick = { viewModel.updateStatusFilter(if (statusFilter == ReadingStatus.UNREAD.name) null else ReadingStatus.UNREAD.name) },
                             label = { Text("未读") }
                         )
                     }
                     item {
                         FilterChip(
                             selected = statusFilter == ReadingStatus.READING.name,
-                            onClick = { viewModel.statusFilter.value = if (statusFilter == ReadingStatus.READING.name) null else ReadingStatus.READING.name },
+                            onClick = { viewModel.updateStatusFilter(if (statusFilter == ReadingStatus.READING.name) null else ReadingStatus.READING.name) },
                             label = { Text("阅读中") }
                         )
                     }
                     item {
                         FilterChip(
                             selected = statusFilter == ReadingStatus.COMPLETED.name,
-                            onClick = { viewModel.statusFilter.value = if (statusFilter == ReadingStatus.COMPLETED.name) null else ReadingStatus.COMPLETED.name },
+                            onClick = { viewModel.updateStatusFilter(if (statusFilter == ReadingStatus.COMPLETED.name) null else ReadingStatus.COMPLETED.name) },
                             label = { Text("已读") }
                         )
                     }
@@ -208,7 +274,7 @@ fun LibraryScreen(
                     verticalArrangement = Arrangement.spacedBy(24.dp),
                     modifier = Modifier.fillMaxSize()
                 ) {
-                    if (recentItems.isNotEmpty()) {
+                    if (recentItems.isNotEmpty() && !isMultiSelectMode) {
                         item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(this.maxLineSpan) }) {
                             Text(
                                 text = "继续阅读",
@@ -237,16 +303,30 @@ fun LibraryScreen(
 
                     item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(this.maxLineSpan) }) {
                         Text(
-                            text = "过滤结果",
+                            text = if (isMultiSelectMode) "选择条目" else "过滤结果",
                             style = MaterialTheme.typography.titleLarge,
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                     }
 
                     items(allItems, key = { it.id }) { item ->
+                        val isSelected = item.id in selectedIds
                         LibraryGridItem(
                             item = item,
-                            onClick = { onNavigateToReader(item.id) },
+                            isSelected = isSelected,
+                            isMultiSelectMode = isMultiSelectMode,
+                            onClick = {
+                                if (isMultiSelectMode) {
+                                    viewModel.toggleSelection(item.id)
+                                } else {
+                                    onNavigateToReader(item.id)
+                                }
+                            },
+                            onLongClick = {
+                                if (!isMultiSelectMode) {
+                                    viewModel.enterMultiSelect(item.id)
+                                }
+                            },
                             onToggleFavorite = { viewModel.toggleFavorite(item) },
                             onUpdateStatus = { viewModel.updateReadingStatus(item, it) }
                         )
@@ -335,20 +415,33 @@ private fun RecentReadItem(item: LibraryItem, onClick: () -> Unit, onToggleFavor
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun LibraryGridItem(
-    modifier: Modifier = Modifier, 
-    item: LibraryItem, 
+    modifier: Modifier = Modifier,
+    item: LibraryItem,
+    isSelected: Boolean = false,
+    isMultiSelectMode: Boolean = false,
     onClick: () -> Unit,
+    onLongClick: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onUpdateStatus: (ReadingStatus) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
 
+    val borderModifier = if (isSelected) {
+        Modifier.border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(8.dp))
+    } else {
+        Modifier
+    }
+
     Column(
         modifier = modifier
             .width(110.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -356,7 +449,8 @@ private fun LibraryGridItem(
                 .aspectRatio(0.7f)
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(8.dp))
-                .background(Color.Gray.copy(alpha = 0.3f)),
+                .background(Color.Gray.copy(alpha = 0.3f))
+                .then(borderModifier),
             contentAlignment = Alignment.Center
         ) {
             if (item.coverPath != null) {
@@ -384,26 +478,50 @@ private fun LibraryGridItem(
                 }
             }
 
-            Box(modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
-                IconButton(
-                    onClick = { expanded = true },
-                    modifier = Modifier.size(24.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+            // 多选模式下的选中指示器
+            if (isMultiSelectMode) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomStart)
+                        .padding(4.dp)
                 ) {
-                    Icon(Icons.Default.MoreVert, "更多菜单", tint = Color.White, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = if (isSelected) Icons.Default.CheckCircle else Icons.Outlined.Circle,
+                        contentDescription = if (isSelected) "已选中" else "未选中",
+                        tint = if (isSelected) MaterialTheme.colorScheme.primary else Color.White,
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(
+                                Color.Black.copy(alpha = 0.5f),
+                                CircleShape
+                            )
+                            .padding(2.dp)
+                    )
                 }
-                DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                    DropdownMenuItem(
-                        text = { Text(if (item.isFavorite) "取消收藏" else "加入收藏") },
-                        onClick = { onToggleFavorite(); expanded = false }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("标记为已读") },
-                        onClick = { onUpdateStatus(ReadingStatus.COMPLETED); expanded = false }
-                    )
-                    DropdownMenuItem(
-                        text = { Text("标记为未读") },
-                        onClick = { onUpdateStatus(ReadingStatus.UNREAD); expanded = false }
-                    )
+            }
+
+            if (!isMultiSelectMode) {
+                Box(modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)) {
+                    IconButton(
+                        onClick = { expanded = true },
+                        modifier = Modifier.size(24.dp).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(12.dp))
+                    ) {
+                        Icon(Icons.Default.MoreVert, "更多菜单", tint = Color.White, modifier = Modifier.size(16.dp))
+                    }
+                    DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        DropdownMenuItem(
+                            text = { Text(if (item.isFavorite) "取消收藏" else "加入收藏") },
+                            onClick = { onToggleFavorite(); expanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("标记为已读") },
+                            onClick = { onUpdateStatus(ReadingStatus.COMPLETED); expanded = false }
+                        )
+                        DropdownMenuItem(
+                            text = { Text("标记为未读") },
+                            onClick = { onUpdateStatus(ReadingStatus.UNREAD); expanded = false }
+                        )
+                    }
                 }
             }
         }

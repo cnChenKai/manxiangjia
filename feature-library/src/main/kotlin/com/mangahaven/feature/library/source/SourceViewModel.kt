@@ -29,8 +29,8 @@ class SourceViewModel @Inject constructor(
     fun addSource(source: Source, onResult: (Boolean, String?) -> Unit) {
         viewModelScope.launch {
             try {
-                // 预先测试连接性
-                if (source.type == SourceType.WEBDAV || source.type == SourceType.SMB) {
+                // 预先测试连接性（所有远程源类型）
+                if (source.type != com.mangahaven.model.SourceType.LOCAL) {
                     val client = sourceClientFactory.create(source)
                     client.list("/") // 探测根目录能否通行
                 }

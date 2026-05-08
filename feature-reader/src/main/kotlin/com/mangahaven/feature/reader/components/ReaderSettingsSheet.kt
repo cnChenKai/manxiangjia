@@ -8,6 +8,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mangahaven.model.ReadingMode
+import com.mangahaven.model.TapZoneProfile
 import com.mangahaven.data.local.repository.ResolvedReaderSettings
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -21,7 +22,8 @@ fun ReaderSettingsSheet(
     onDoublePageChange: (Boolean, Boolean) -> Unit,
     onVolumeKeysChange: (Boolean, Boolean) -> Unit,
     onPageOffsetChange: (Int) -> Unit,
-    onResetToGlobal: () -> Unit
+    onResetToGlobal: () -> Unit,
+    onTapZoneProfileChange: (TapZoneProfile) -> Unit,
 ) {
     if (!isVisible) return
 
@@ -61,7 +63,7 @@ fun ReaderSettingsSheet(
                     Text("本书存在独立设置，点击恢复为全局默认")
                 }
             }
-            Divider()
+            HorizontalDivider()
 
             // 阅读方向
             Text("阅读方向", style = MaterialTheme.typography.titleMedium)
@@ -71,11 +73,12 @@ fun ReaderSettingsSheet(
                     .selectableGroup(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                ReadingMode.values().forEach { mode ->
+                ReadingMode.entries.forEach { mode ->
                     val label = when (mode) {
                         ReadingMode.LEFT_TO_RIGHT -> "从左至右"
                         ReadingMode.RIGHT_TO_LEFT -> "从右至左"
-                        ReadingMode.VERTICAL -> "上下滚动"
+                        ReadingMode.VERTICAL -> "上下翻页"
+                        ReadingMode.CONTINUOUS_VERTICAL -> "连续滚动"
                     }
                     FilterChip(
                         selected = settings.readingMode == mode,
@@ -84,6 +87,43 @@ fun ReaderSettingsSheet(
                     )
                 }
             }
+
+            // 点击区域配置
+            Text("点击区域", style = MaterialTheme.typography.titleMedium)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                TapZoneProfile.values().forEach { profile ->
+                    val label = when (profile) {
+                        TapZoneProfile.DEFAULT -> "默认（左右边缘翻页）"
+                        TapZoneProfile.LEFT_RIGHT -> "左右分区（半屏翻页）"
+                        TapZoneProfile.L_SHAPE -> "L 形（左+右下翻页）"
+                        TapZoneProfile.KINDLE_STYLE -> "Kindle（窄边翻页）"
+                    }
+                    val description = when (profile) {
+                        TapZoneProfile.DEFAULT -> "左侧 30% 上一页，右侧 30% 下一页，中间切换菜单"
+                        TapZoneProfile.LEFT_RIGHT -> "左半边上一页，右半边下一页，中间窄条切换菜单"
+                        TapZoneProfile.L_SHAPE -> "左侧上一页，右下角下一页，其余切换菜单"
+                        TapZoneProfile.KINDLE_STYLE -> "左边缘 20% 上一页，右边缘 20% 下一页，中间切换菜单"
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(
+                            selected = settings.tapZoneProfile == profile,
+                            onClick = { onTapZoneProfileChange(profile) }
+                        )
+                        Column(modifier = Modifier.padding(start = 8.dp)) {
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
+
+            HorizontalDivider()
 
             // 白边裁切
             Row(
@@ -143,7 +183,7 @@ fun ReaderSettingsSheet(
                     }
                 }
             }
-            
+
             Spacer(modifier = Modifier.height(32.dp))
         }
     }

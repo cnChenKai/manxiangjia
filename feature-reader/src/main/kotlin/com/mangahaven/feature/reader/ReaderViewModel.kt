@@ -47,7 +47,8 @@ class ReaderViewModel @Inject constructor(
                 keepScreenOn = true,
                 volumeKeysPaging = true,
                 enablePreload = true,
-                isOverridden = false
+                isOverridden = false,
+                tapZoneProfile = TapZoneProfile.DEFAULT,
             )
         )
 
@@ -190,6 +191,16 @@ class ReaderViewModel @Inject constructor(
     fun resetToGlobalSettings() {
         viewModelScope.launch {
             itemSettingsRepository.resetToGlobal(itemId)
+        }
+    }
+
+    /**
+     * 更新点击区域配置（全局设置）。
+     */
+    fun updateTapZoneProfile(profile: TapZoneProfile) {
+        viewModelScope.launch {
+            val current = settingsDataStore.settingsFlow.first()
+            settingsDataStore.updateSettings(current.copy(tapZoneProfile = profile))
         }
     }
 

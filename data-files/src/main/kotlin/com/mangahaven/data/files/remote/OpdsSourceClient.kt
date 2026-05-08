@@ -10,10 +10,31 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
+import okhttp3.Response
 import timber.log.Timber
 import java.io.InputStream
 import java.io.IOException
 import java.io.StringReader
+
+/**
+ * 包装 OkHttp Response 的 InputStream，关闭流时同时关闭底层 Response，避免连接泄漏。
+ */
+private class ResponseClosingInputStream(
+    private val delegate: InputStream,
+    private val response: Response,
+) : InputStream() {
+    override fun read(): Int = delegate.read()
+    override fun read(b: ByteArray): Int = delegate.read(b)
+    override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
+    override fun available(): Int = delegate.available()
+    override fun close() {
+        try { delegate.close() } finally { response.close() }
+    }
+    override fun mark(readlimit: Int) = delegate.mark(readlimit)
+    override fun reset() = delegate.reset()
+    override fun markSupported(): Boolean = delegate.markSupported()
+    override fun skip(n: Long): Long = delegate.skip(n)
+}
 
 /**
  * OPDS 协议的内容源客户端。
@@ -38,7 +59,7 @@ class OpdsSourceClient(
             try {
                 okHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) {
-                        throw IOException("OPDS server returned HTTP \${response.code}: \${response.message}")
+                        throw IOException("OPDS server returned HTTP ${response.code}: ${response.message}")
                     }
                     val bodyString = response.body?.string() ?: ""
                     if (bodyString.isEmpty()) {
@@ -47,7 +68,7 @@ class OpdsSourceClient(
                     parseOpdsXml(bodyString, requestUrl)
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Failed to list OPDS path: \$path")
+                Timber.e(e, "Failed to list OPDS path: $path")
                 throw e
             }
         }
@@ -70,7 +91,7 @@ class OpdsSourceClient(
                     } else null
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Failed to stat OPDS path: \$path")
+                Timber.e(e, "Failed to stat OPDS path: $path")
                 null
             }
         }
@@ -81,9 +102,11 @@ class OpdsSourceClient(
             val response = okHttpClient.newCall(request).execute()
             if (!response.isSuccessful) {
                 response.close()
-                throw IOException("OPDS server returned HTTP \${response.code}")
+                throw IOException("OPDS server returned HTTP ${response.code}")
             }
-            response.body?.byteStream() ?: throw IOException("Empty OPDS body for \$path")
+            val body = response.body ?: run { response.close(); throw IOException("Empty OPDS body for $path") }
+            // 包装流，关闭时自动释放 Response 连接
+            ResponseClosingInputStream(body.byteStream(), response)
         }
 
     override suspend fun exists(path: String): Boolean =

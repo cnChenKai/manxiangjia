@@ -20,6 +20,26 @@ import java.time.format.DateTimeFormatter
 import javax.xml.parsers.DocumentBuilderFactory
 
 /**
+ * 包装 OkHttp Response 的 InputStream，关闭流时同时关闭底层 Response，避免连接泄漏。
+ */
+private class ResponseClosingInputStream(
+    private val delegate: InputStream,
+    private val response: Response,
+) : InputStream() {
+    override fun read(): Int = delegate.read()
+    override fun read(b: ByteArray): Int = delegate.read(b)
+    override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
+    override fun available(): Int = delegate.available()
+    override fun close() {
+        try { delegate.close() } finally { response.close() }
+    }
+    override fun mark(readlimit: Int) = delegate.mark(readlimit)
+    override fun reset() = delegate.reset()
+    override fun markSupported(): Boolean = delegate.markSupported()
+    override fun skip(n: Long): Long = delegate.skip(n)
+}
+
+/**
  * 基于 OkHttp 和内置 XML 解析的轻量级 WebDAV 客户端。
  */
 class WebDavSourceClient(
@@ -88,7 +108,9 @@ class WebDavSourceClient(
             throw IllegalStateException("Failed to GET WebDAV stream: ${response.code}")
         }
         
-        response.body?.byteStream() ?: throw IllegalStateException("Empty WebDAV body")
+        val body = response.body ?: run { response.close(); throw IllegalStateException("Empty WebDAV body") }
+        // 包装流，关闭时自动释放 Response 连接
+        ResponseClosingInputStream(body.byteStream(), response)
     }
 
     override suspend fun exists(path: String): Boolean {

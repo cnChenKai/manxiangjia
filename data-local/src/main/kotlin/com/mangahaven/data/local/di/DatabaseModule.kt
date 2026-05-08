@@ -10,7 +10,11 @@ import com.mangahaven.data.local.SettingsDataStore
 import com.mangahaven.data.local.dao.ItemSettingsDao
 import com.mangahaven.data.local.dao.LibraryItemDao
 import com.mangahaven.data.local.dao.ReadingProgressDao
+import com.mangahaven.data.local.dao.SnapshotDao
 import com.mangahaven.data.local.dao.SourceDao
+import com.mangahaven.data.local.dao.TagDao
+import com.mangahaven.data.local.repository.LocalTagRepository
+import com.mangahaven.model.TagRepository
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -35,6 +39,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "mangahaven.db",
         )
+            .addMigrations(AppDatabase.MIGRATION_4_5)
             .fallbackToDestructiveMigration()
             .build()
     }
@@ -57,6 +62,22 @@ object DatabaseModule {
     @Provides
     fun provideItemSettingsDao(database: AppDatabase): ItemSettingsDao {
         return database.itemSettingsDao()
+    }
+
+    @Provides
+    fun provideTagDao(database: AppDatabase): TagDao {
+        return database.tagDao()
+    }
+
+    @Provides
+    fun provideSnapshotDao(database: AppDatabase): SnapshotDao {
+        return database.snapshotDao()
+    }
+
+    @Provides
+    @Singleton
+    fun provideTagRepository(tagDao: TagDao): TagRepository {
+        return LocalTagRepository(tagDao)
     }
 
     @Provides

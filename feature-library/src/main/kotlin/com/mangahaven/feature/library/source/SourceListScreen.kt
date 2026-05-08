@@ -9,6 +9,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FolderShared
+import androidx.compose.material.icons.filled.LibraryBooks
 import androidx.compose.material.icons.filled.Public
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,9 +32,10 @@ fun SourceListScreen(
     val sources by viewModel.sources.collectAsState(initial = emptyList())
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
-    
+
     var showWebDavDialog by remember { mutableStateOf(false) }
     var showSmbDialog by remember { mutableStateOf(false) }
+    var showOpdsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         topBar = {
@@ -48,6 +50,12 @@ fun SourceListScreen(
         },
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End) {
+                ExtendedFloatingActionButton(
+                    text = { Text("添加 OPDS") },
+                    icon = { Icon(Icons.Default.LibraryBooks, contentDescription = null) },
+                    onClick = { showOpdsDialog = true },
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
                 ExtendedFloatingActionButton(
                     text = { Text("添加 SMB") },
                     icon = { Icon(Icons.Default.Add, contentDescription = null) },
@@ -73,7 +81,7 @@ fun SourceListScreen(
                     onClick = { onNavigateToBrowser(source.id) },
                     onDelete = { viewModel.removeSource(source.id) }
                 )
-                Divider()
+                HorizontalDivider()
             }
         }
     }
@@ -81,6 +89,7 @@ fun SourceListScreen(
     val onSaveSource: (Source) -> Unit = { source ->
         showWebDavDialog = false
         showSmbDialog = false
+        showOpdsDialog = false
         coroutineScope.launch {
             snackbarHostState.showSnackbar("正在连接测试...")
         }
@@ -102,17 +111,34 @@ fun SourceListScreen(
     if (showSmbDialog) {
         SourceConfigDialog(sourceType = SourceType.SMB, onDismiss = { showSmbDialog = false }, onSave = onSaveSource)
     }
+
+    if (showOpdsDialog) {
+        SourceConfigDialog(sourceType = SourceType.OPDS, onDismiss = { showOpdsDialog = false }, onSave = onSaveSource)
+    }
 }
 
 @Composable
 private fun SourceItem(source: Source, onClick: () -> Unit, onDelete: () -> Unit) {
+    val icon = when (source.type) {
+        SourceType.WEBDAV -> Icons.Default.Public
+        SourceType.OPDS -> Icons.Default.LibraryBooks
+        else -> Icons.Default.FolderShared
+    }
+
     ListItem(
         modifier = Modifier.clickable(onClick = onClick),
         headlineContent = { Text(source.name) },
-        supportingContent = { Text(source.configJson) },
+        supportingContent = {
+            Text(
+                text = when (source.type) {
+                    SourceType.OPDS -> "[OPDS] ${source.configJson}"
+                    else -> source.configJson
+                }
+            )
+        },
         leadingContent = {
             Icon(
-                imageVector = if (source.type == SourceType.WEBDAV) Icons.Default.Public else Icons.Default.FolderShared,
+                imageVector = icon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary
             )

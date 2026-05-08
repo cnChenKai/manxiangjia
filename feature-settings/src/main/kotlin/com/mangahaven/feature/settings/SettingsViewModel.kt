@@ -5,13 +5,16 @@ import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.imageLoader
+import com.mangahaven.data.files.cache.RemoteArchiveCacheManager
 import com.mangahaven.data.files.thumbnail.ThumbnailGenerator
 import com.mangahaven.data.local.AppSettingsDataStore
 import com.mangahaven.data.local.SettingsBackupManager
 import com.mangahaven.data.local.SettingsDataStore
 import com.mangahaven.data.local.cover.CoverManager
+import com.mangahaven.data.local.repository.LibraryRepository
 import com.mangahaven.model.ReaderSettings
 import com.mangahaven.model.ReadingMode
+import com.mangahaven.model.ReadingStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -26,6 +29,18 @@ import timber.log.Timber
 import java.util.Locale
 import javax.inject.Inject
 
+/**
+ * 书库统计数据。
+ */
+data class LibraryStats(
+    val totalItems: Int = 0,
+    val unreadCount: Int = 0,
+    val readingCount: Int = 0,
+    val completedCount: Int = 0,
+    val favoriteCount: Int = 0,
+    val remoteCount: Int = 0,
+)
+
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val appSettingsDataStore: AppSettingsDataStore,
@@ -33,6 +48,8 @@ class SettingsViewModel @Inject constructor(
     private val coverManager: CoverManager,
     private val thumbnailGenerator: ThumbnailGenerator,
     private val backupManager: SettingsBackupManager,
+    private val libraryRepository: LibraryRepository,
+    private val remoteArchiveCacheManager: RemoteArchiveCacheManager,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
@@ -42,12 +59,16 @@ class SettingsViewModel @Inject constructor(
     private val _backupMessage = MutableStateFlow<String?>(null)
     val backupMessage: StateFlow<String?> = _backupMessage.asStateFlow()
 
+    private val _libraryStats = MutableStateFlow(LibraryStats())
+    val libraryStats: StateFlow<LibraryStats> = _libraryStats.asStateFlow()
+
     fun clearBackupMessage() {
         _backupMessage.value = null
     }
 
     init {
         updateCacheSize()
+        loadLibraryStats()
     }
 
     val privacyLockEnabled: StateFlow<Boolean> = appSettingsDataStore.privacyLockEnabledFlow
@@ -141,10 +162,36 @@ class SettingsViewModel @Inject constructor(
             withContext(Dispatchers.IO) {
                 coverManager.clearAll()
                 thumbnailGenerator.clearAll()
+                remoteArchiveCacheManager.clearAll()
                 context.imageLoader.diskCache?.clear()
                 context.imageLoader.memoryCache?.clear()
             }
             updateCacheSize()
+        }
+    }
+
+    /** 重新加载书库统计 */
+    fun refreshStats() {
+        loadLibraryStats()
+    }
+
+    private fun loadLibraryStats() {
+        viewModelScope.launch {
+            try {
+                val dao = libraryRepository
+                val total = dao.count()
+                val unread = dao.countByStatus(ReadingStatus.UNREAD.name)
+                val reading = dao.countByStatus(ReadingStatus.READING.name)
+                val completed = dao.countByStatus(ReadingStatus.COMPLETED.name)
+                _libraryStats.value = LibraryStats(
+                    totalItems = total,
+                    unreadCount = unread,
+                    readingCount = reading,
+                    completedCount = completed,
+                )
+            } catch (e: Exception) {
+                Timber.e(e, "加载书库统计失败")
+            }
         }
     }
 
@@ -153,8 +200,9 @@ class SettingsViewModel @Inject constructor(
             val size = withContext(Dispatchers.IO) {
                 val coverSize = coverManager.getCacheSize()
                 val thumbnailSize = thumbnailGenerator.getCacheSize()
+                val remoteArchiveSize = remoteArchiveCacheManager.getCacheSize()
                 val coilSize = context.imageLoader.diskCache?.size ?: 0L
-                coverSize + thumbnailSize + coilSize
+                coverSize + thumbnailSize + remoteArchiveSize + coilSize
             }
             _cacheSize.value = formatSize(size)
         }

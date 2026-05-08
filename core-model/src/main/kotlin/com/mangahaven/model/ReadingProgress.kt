@@ -23,4 +23,5 @@ enum class ReadingMode {
     LEFT_TO_RIGHT,
     RIGHT_TO_LEFT,
     VERTICAL,
+    CONTINUOUS_VERTICAL,
 }

@@ -16,4 +16,5 @@ data class SourceEntity(
     val authRef: String? = null,
     val isWritable: Boolean = false,
     val lastSyncAt: Long? = null,
+    val isVirtual: Boolean = false,
 )

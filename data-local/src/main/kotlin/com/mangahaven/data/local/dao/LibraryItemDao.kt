@@ -68,4 +68,16 @@ interface LibraryItemDao {
 
     @Query("SELECT COUNT(*) FROM library_items")
     suspend fun count(): Int
+
+    /** 按阅读状态统计数量 */
+    @Query("SELECT COUNT(*) FROM library_items WHERE readingStatus = :status")
+    suspend fun countByStatus(status: String): Int
+
+    /** 收藏条目数量 */
+    @Query("SELECT COUNT(*) FROM library_items WHERE isFavorite = 1")
+    suspend fun countFavorites(): Int
+
+    /** 远程条目数量 */
+    @Query("SELECT COUNT(*) FROM library_items WHERE itemType = 'REMOTE_ENTRY'")
+    suspend fun countRemoteItems(): Int
 }
