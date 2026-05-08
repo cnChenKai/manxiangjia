@@ -25,8 +25,13 @@ class RarArchiveContainerReader(
     @dagger.hilt.android.qualifiers.ApplicationContext private val context: Context,
 ) : ContainerReader {
 
-    // Cache entry lookup metadata: archive Uri string -> (entryPath -> index in fileHeaders)
-    private val headerIndexCache = ConcurrentHashMap<String, Map<String, Int>>()
+    private data class CacheEntry(
+        val entryCount: Int,
+        val indexMap: Map<String, Int>,
+    )
+
+    // Cache entry lookup metadata: archive Uri string -> CacheEntry
+    private val headerIndexCache = ConcurrentHashMap<String, CacheEntry>()
 
     // Helper to get a File from URI since Junrar works best with random access File objects
     private suspend fun getTempFile(uri: Uri): File = withContext(Dispatchers.IO) {
@@ -78,7 +83,10 @@ class RarArchiveContainerReader(
                     }
                 }
 
-                headerIndexCache[uriString] = indexMap
+                headerIndexCache[uriString] = CacheEntry(
+                    entryCount = fileHeaders.size,
+                    indexMap = indexMap,
+                )
             } catch (e: Exception) {
                 Timber.e(e, "Failed to list pages in RAR archive: ${target.path}")
                 return@withContext emptyList()
@@ -119,10 +127,10 @@ class RarArchiveContainerReader(
                 val fileHeaders = archive.fileHeaders
                 val uriString = archiveUri.toString()
 
-                // Fast path: cached index lookup
-                val cachedIndices = headerIndexCache[uriString]
-                if (cachedIndices != null) {
-                    val index = cachedIndices[entryPath]
+                // Fast path: cached index lookup with entryCount validation
+                val cachedEntry = headerIndexCache[uriString]
+                if (cachedEntry != null && cachedEntry.entryCount == fileHeaders.size) {
+                    val index = cachedEntry.indexMap[entryPath]
                     if (index != null && index >= 0 && index < fileHeaders.size) {
                         val header = fileHeaders[index]
                         val name = header.fileName ?: header.fileNameW
@@ -132,6 +140,9 @@ class RarArchiveContainerReader(
                             return@withContext ByteArrayInputStream(baos.toByteArray())
                         }
                     }
+                } else if (cachedEntry != null) {
+                    // Entry count changed — archive was modified, invalidate cache
+                    headerIndexCache.remove(uriString)
                 }
 
                 // Fallback path: linear scan
@@ -139,12 +150,14 @@ class RarArchiveContainerReader(
                     val header = fileHeaders[i]
                     val name = header.fileName ?: header.fileNameW
                     if (name == entryPath) {
-                        // Opportunistic cache update for the single entry if cache didn't exist or was wrong
-                        // Note: A full listPages call is needed to fully populate the cache, but this helps
-                        // if listPages wasn't called.
-                        val currentMap = headerIndexCache[uriString]?.toMutableMap() ?: mutableMapOf()
+                        // Opportunistic cache update
+                        val existing = headerIndexCache[uriString]
+                        val currentMap = existing?.indexMap?.toMutableMap() ?: mutableMapOf()
                         currentMap[entryPath] = i
-                        headerIndexCache[uriString] = currentMap
+                        headerIndexCache[uriString] = CacheEntry(
+                            entryCount = fileHeaders.size,
+                            indexMap = currentMap,
+                        )
 
                         val baos = ByteArrayOutputStream()
                         archive.extractFile(header, baos)
@@ -172,6 +185,13 @@ class RarArchiveContainerReader(
                 null
             }
         }
+
+    /**
+     * 清除索引缓存。当外部检测到 archive 变化时可调用。
+     */
+    fun clearCache() {
+        headerIndexCache.clear()
+    }
 
     private data class RarEntryInfo(
         val name: String,
