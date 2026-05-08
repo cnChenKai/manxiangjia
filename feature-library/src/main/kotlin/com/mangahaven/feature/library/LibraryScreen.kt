@@ -188,7 +188,8 @@ fun LibraryScreen(
                                 showImportMenu = false
                                 fileLauncher.launch(arrayOf(
                                     "application/x-mobipocket-ebook",
-                                    "application/x-mobi"
+                                    "application/x-mobi",
+                                    "application/octet-stream"
                                 ))
                             },
                             icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },

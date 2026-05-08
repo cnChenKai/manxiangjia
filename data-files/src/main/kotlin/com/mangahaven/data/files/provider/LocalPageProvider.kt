@@ -26,6 +26,7 @@ class LocalPageProvider(
     private val folderReader by lazy { FolderContainerReader(context) }
     private val archiveReader by lazy { ArchiveContainerReader(context) }
     private val rarReader by lazy { com.mangahaven.data.files.container.RarArchiveContainerReader(context) }
+    private val epubReader by lazy { com.mangahaven.data.files.container.EpubContainerReader(context) }
     private val mobiReader by lazy { com.mangahaven.data.files.container.MobiContainerReader(context) }
 
     private fun isRarArchive(path: String): Boolean {
@@ -40,13 +41,14 @@ class LocalPageProvider(
         return pages ?: run {
             val loadedPages = when (containerTarget.itemType) {
                 LibraryItemType.FOLDER -> folderReader.listPages(containerTarget)
-                LibraryItemType.ARCHIVE, LibraryItemType.EPUB, LibraryItemType.PDF -> {
+                LibraryItemType.ARCHIVE, LibraryItemType.PDF -> {
                     if (isRarArchive(containerTarget.path)) {
                         rarReader.listPages(containerTarget)
                     } else {
                         archiveReader.listPages(containerTarget)
                     }
                 }
+                LibraryItemType.EPUB -> epubReader.listPages(containerTarget)
                 LibraryItemType.MOBI -> mobiReader.listPages(containerTarget)
                 else -> emptyList()
             }
@@ -67,13 +69,17 @@ class LocalPageProvider(
 
             when (containerTarget.itemType) {
                 LibraryItemType.FOLDER -> folderReader.openPage(pageRef)
-                LibraryItemType.ARCHIVE, LibraryItemType.EPUB, LibraryItemType.PDF -> {
+                LibraryItemType.ARCHIVE, LibraryItemType.PDF -> {
                     val archiveUri = Uri.parse(containerTarget.path)
                     if (isRarArchive(containerTarget.path)) {
                         rarReader.openPageFromArchive(archiveUri, pageRef.path)
                     } else {
                         archiveReader.openPageFromArchive(archiveUri, pageRef.path)
                     }
+                }
+                LibraryItemType.EPUB -> {
+                    val epubUri = Uri.parse(containerTarget.path)
+                    epubReader.openPageFromArchive(epubUri, pageRef.path)
                 }
                 LibraryItemType.MOBI -> {
                     val mobiUri = Uri.parse(containerTarget.path)
