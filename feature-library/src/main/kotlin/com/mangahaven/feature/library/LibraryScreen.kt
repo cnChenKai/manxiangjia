@@ -162,10 +162,10 @@ fun LibraryScreen(
                         ExtendedFloatingActionButton(
                             onClick = {
                                 showImportMenu = false
-                                fileLauncher.launch(arrayOf("application/zip", "application/x-cbz-compressed", "application/octet-stream"))
+                                fileLauncher.launch(arrayOf("application/zip", "application/x-cbz-compressed", "application/epub+zip", "application/x-mobipocket-ebook", "application/octet-stream"))
                             },
                             icon = { Icon(Icons.Default.InsertDriveFile, contentDescription = null) },
-                            text = { Text("导入 ZIP/CBZ") },
+                            text = { Text("导入 ZIP/CBZ/EPUB/MOBI") },
                             modifier = Modifier.padding(bottom = 8.dp)
                         )
                         ExtendedFloatingActionButton(

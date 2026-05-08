@@ -33,6 +33,7 @@ enum class LibraryItemType {
     BOOK,
     REMOTE_ENTRY,
     EPUB,
+    MOBI,
     PDF
 }
 

@@ -39,7 +39,7 @@ class LocalPageProvider(
         return pages ?: run {
             val loadedPages = when (containerTarget.itemType) {
                 LibraryItemType.FOLDER -> folderReader.listPages(containerTarget)
-                LibraryItemType.ARCHIVE, LibraryItemType.EPUB, LibraryItemType.PDF -> {
+                LibraryItemType.ARCHIVE, LibraryItemType.EPUB, LibraryItemType.MOBI, LibraryItemType.PDF -> {
                     if (isRarArchive(containerTarget.path)) {
                         rarReader.listPages(containerTarget)
                     } else {
@@ -65,7 +65,7 @@ class LocalPageProvider(
 
             when (containerTarget.itemType) {
                 LibraryItemType.FOLDER -> folderReader.openPage(pageRef)
-                LibraryItemType.ARCHIVE, LibraryItemType.EPUB, LibraryItemType.PDF -> {
+                LibraryItemType.ARCHIVE, LibraryItemType.EPUB, LibraryItemType.MOBI, LibraryItemType.PDF -> {
                     val archiveUri = Uri.parse(containerTarget.path)
                     if (isRarArchive(containerTarget.path)) {
                         rarReader.openPageFromArchive(archiveUri, pageRef.path)
