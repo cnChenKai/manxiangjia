@@ -4,6 +4,10 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 
+/**
+ * MobiContainerReader 图片 magic 检测测试。
+ * 直接测试 companion object 中的静态方法。
+ */
 class MobiMagicDetectionTest {
 
     @Test
@@ -32,7 +36,6 @@ class MobiMagicDetectionTest {
 
     @Test
     fun `detect WebP with full RIFF-WEBP check`() {
-        // RIFF (4 bytes) + file size (4 bytes) + WEBP (4 bytes)
         val magic = byteArrayOf(
             'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
             0, 0, 0, 0,
@@ -43,7 +46,6 @@ class MobiMagicDetectionTest {
 
     @Test
     fun `reject RIFF without WEBP marker`() {
-        // RIFF but not WEBP (e.g. RIFF audio file)
         val magic = byteArrayOf(
             'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
             0, 0, 0, 0,
@@ -54,7 +56,6 @@ class MobiMagicDetectionTest {
 
     @Test
     fun `reject RIFF with only 8 bytes`() {
-        // Only RIFF header, not enough for WEBP check
         val magic = byteArrayOf(
             'R'.code.toByte(), 'I'.code.toByte(), 'F'.code.toByte(), 'F'.code.toByte(),
             0, 0, 0, 0,

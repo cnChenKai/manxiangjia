@@ -2,7 +2,6 @@ package com.mangahaven.data.files.container
 
 import android.content.Context
 import android.net.Uri
-import android.os.ParcelFileDescriptor
 import com.mangahaven.data.files.ContainerReader
 import com.mangahaven.model.ContainerTarget
 import com.mangahaven.model.PageRef
@@ -11,16 +10,17 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.ByteArrayInputStream
-import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.io.RandomAccessFile
+import java.nio.ByteBuffer
+import java.nio.channels.FileChannel
+import java.nio.channels.ReadableByteChannel
 import java.util.concurrent.ConcurrentHashMap
 
 /**
  * MOBI/PDB 容器读取器。
  *
  * 解析 PalmDOC (PDB) 格式的 MOBI 文件，提取内嵌图片作为漫画页面。
- * 使用 ParcelFileDescriptor 实现随机访问，避免重复复制文件。
+ * 使用 ParcelFileDescriptor + FileChannel 实现随机访问，避免复制文件。
  *
  * MOBI 文件结构：
  *   PDB Header (78 bytes)
@@ -37,20 +37,14 @@ class MobiContainerReader(
      * 缓存已解析的 MOBI 索引，key 为 URI 字符串。
      * 生命周期与 reader 实例一致（由 LocalPageProvider 持有）。
      */
-    private val indexCache = ConcurrentHashMap<String, CachedMobiIndex>()
-
-    private data class CachedMobiIndex(
-        val entries: List<MobiImageEntry>,
-        val fileLength: Long,
-    )
+    private val indexCache = ConcurrentHashMap<String, List<MobiImageEntry>>()
 
     override suspend fun listPages(target: ContainerTarget): List<PageRef> =
         withContext(Dispatchers.IO) {
             val uri = Uri.parse(target.path)
-            val uriStr = target.path
 
             try {
-                val entries = getOrLoadIndex(uri, uriStr)
+                val entries = getOrLoadIndex(uri, target.path)
                 entries
                     .sortedWith(compareBy(ImageFileUtils.naturalOrderComparator) { it.name })
                     .mapIndexed { index, entry ->
@@ -77,14 +71,11 @@ class MobiContainerReader(
 
     /**
      * 从 MOBI 文件中读取指定页面。
-     * 使用 ParcelFileDescriptor 获取可随机访问的文件描述符，避免复制文件。
-     * @param mobiUri MOBI 文件的 URI
-     * @param pageIndex 页面索引
+     * 使用 ParcelFileDescriptor 获取文件通道，避免复制文件。
      */
     suspend fun openPageFromMobi(mobiUri: Uri, pageIndex: Int): InputStream =
         withContext(Dispatchers.IO) {
-            val uriStr = mobiUri.toString()
-            val entries = getOrLoadIndex(mobiUri, uriStr)
+            val entries = getOrLoadIndex(mobiUri, mobiUri.toString())
 
             if (pageIndex < 0 || pageIndex >= entries.size) {
                 throw IndexOutOfBoundsException("Page index $pageIndex out of range [0, ${entries.size})")
@@ -95,10 +86,13 @@ class MobiContainerReader(
                 ?: throw IllegalStateException("Cannot open MOBI file: $mobiUri")
             try {
                 pfd.use { fd ->
-                    RandomAccessFile(fd.fileDescriptor).use { raf ->
-                        raf.seek(entry.offset.toLong())
-                        val bytes = ByteArray(entry.size)
-                        raf.readFully(bytes)
+                    java.io.FileInputStream(fd.fileDescriptor).channel.use { channel ->
+                        channel.position(entry.offset.toLong())
+                        val buf = ByteBuffer.allocate(entry.size)
+                        channel.readFully(buf)
+                        buf.flip()
+                        val bytes = ByteArray(buf.remaining())
+                        buf.get(bytes)
                         return@withContext ByteArrayInputStream(bytes)
                     }
                 }
@@ -111,8 +105,7 @@ class MobiContainerReader(
         withContext(Dispatchers.IO) {
             try {
                 val uri = Uri.parse(target.path)
-                val uriStr = target.path
-                val entries = getOrLoadIndex(uri, uriStr)
+                val entries = getOrLoadIndex(uri, target.path)
 
                 if (entries.isNotEmpty()) {
                     // Fallback to first image; MOBI cover metadata (EXTH) parsing
@@ -121,10 +114,13 @@ class MobiContainerReader(
                     val pfd = context.contentResolver.openFileDescriptor(uri, "r")
                         ?: return@withContext null
                     pfd.use { fd ->
-                        RandomAccessFile(fd.fileDescriptor).use { raf ->
-                            raf.seek(cover.offset.toLong())
-                            val bytes = ByteArray(cover.size)
-                            raf.readFully(bytes)
+                        java.io.FileInputStream(fd.fileDescriptor).channel.use { channel ->
+                            channel.position(cover.offset.toLong())
+                            val buf = ByteBuffer.allocate(cover.size)
+                            channel.readFully(buf)
+                            buf.flip()
+                            val bytes = ByteArray(buf.remaining())
+                            buf.get(bytes)
                             return@withContext ByteArrayInputStream(bytes)
                         }
                     }
@@ -138,26 +134,23 @@ class MobiContainerReader(
 
     /**
      * 获取或加载 MOBI 索引缓存。
-     * 使用 openFileDescriptor 避免复制文件。
      */
     private fun getOrLoadIndex(uri: Uri, uriStr: String): List<MobiImageEntry> {
-        indexCache[uriStr]?.let { return it.entries }
+        indexCache[uriStr]?.let { return it }
 
-        val entries = mutableListOf<MobiImageEntry>()
         val pfd = context.contentResolver.openFileDescriptor(uri, "r")
             ?: throw IllegalStateException("Cannot open MOBI file: $uri")
         pfd.use { fd ->
-            RandomAccessFile(fd.fileDescriptor).use { raf ->
-                entries.addAll(parseMobiImages(raf))
+            java.io.FileInputStream(fd.fileDescriptor).channel.use { channel ->
+                val entries = parseMobiImages(channel)
+                indexCache[uriStr] = entries
+                return entries
             }
         }
-
-        indexCache[uriStr] = CachedMobiIndex(entries, 0)
-        return entries
     }
 
     /**
-     * 清除指定 URI 的缓存（文件被替换时调用）。
+     * 清除指定 URI 的缓存。
      */
     fun invalidateCache(uri: String) {
         indexCache.remove(uri)
@@ -185,27 +178,23 @@ class MobiContainerReader(
      * 先尝试从 MOBI header 读取 imageFirst 作为优化起点，
      * 但不依赖不可靠的 imageCount 字段。
      */
-    private fun parseMobiImages(raf: RandomAccessFile): List<MobiImageEntry> {
-        val fileLength = raf.length().toInt()
+    private fun parseMobiImages(channel: FileChannel): List<MobiImageEntry> {
+        val fileLength = channel.size().toInt()
         if (fileLength < 78) return emptyList()
 
         // ── PDB Header ──
-        raf.seek(0)
-        val pdbHeader = ByteArray(78)
-        raf.readFully(pdbHeader)
+        channel.position(0)
+        val pdbHeader = readBytes(channel, 78)
 
         val numRecords = ((pdbHeader[76].toInt() and 0xFF) shl 8) or (pdbHeader[77].toInt() and 0xFF)
         if (numRecords <= 0 || numRecords > 100000) return emptyList()
 
         // ── Record Entry List ──
         val recordOffsets = mutableListOf<Int>()
-        val recordEntryStart = 78
+        val recordEntryStart = 78L
+        channel.position(recordEntryStart)
         for (i in 0 until numRecords) {
-            val base = recordEntryStart + i * 8
-            if (base + 8 > fileLength) break
-            raf.seek(base.toLong())
-            val buf = ByteArray(4)
-            raf.readFully(buf)
+            val buf = readBytes(channel, 8)
             val offset = ((buf[0].toInt() and 0xFF) shl 24) or
                     ((buf[1].toInt() and 0xFF) shl 16) or
                     ((buf[2].toInt() and 0xFF) shl 8) or
@@ -216,42 +205,33 @@ class MobiContainerReader(
         if (recordOffsets.isEmpty()) return emptyList()
 
         // ── Try to find imageFirst from MOBI header ──
-        val imageFirst = tryGetImageFirst(raf, recordOffsets)
+        val imageFirst = tryGetImageFirst(channel, recordOffsets)
 
         // ── Scan for image records using magic bytes ──
-        // Start from imageFirst if available, otherwise scan from record 1
         val scanStart = if (imageFirst in 1 until recordOffsets.size) imageFirst else 1
-        val entries = scanForImageRecords(raf, recordOffsets, fileLength, scanStart)
-
-        return entries
+        return scanForImageRecords(channel, recordOffsets, fileLength, scanStart)
     }
 
     /**
-     * 尝试从 MOBI header 读取 imageFirst（第一个图片记录的索引）。
-     * 不读取 imageCount，因为其偏移量在不同 MOBI 版本中不一致。
+     * 尝试从 MOBI header 读取 imageFirst。
      * 返回 -1 表示未找到。
      */
-    private fun tryGetImageFirst(raf: RandomAccessFile, recordOffsets: List<Int>): Int {
+    private fun tryGetImageFirst(channel: FileChannel, recordOffsets: List<Int>): Int {
         if (recordOffsets.isEmpty()) return -1
 
         try {
             val record0Offset = recordOffsets[0]
-            raf.seek((record0Offset + 16).toLong())
-            val mobiMagic = ByteArray(4)
-            raf.readFully(mobiMagic)
+            channel.position((record0Offset + 16).toLong())
+            val mobiMagic = readBytes(channel, 4)
             if (String(mobiMagic, Charsets.US_ASCII) != "MOBI") return -1
 
-            // MOBI header length at record0 + 20
-            raf.seek((record0Offset + 20).toLong())
-            val headerLenBuf = ByteArray(4)
-            raf.readFully(headerLenBuf)
+            channel.position((record0Offset + 20).toLong())
+            val headerLenBuf = readBytes(channel, 4)
             val headerLen = bufToInt(headerLenBuf)
 
-            // imageFirst at MOBI header offset 108 (record0 + 16 + 108)
             if (headerLen < 112) return -1
-            raf.seek((record0Offset + 16 + 108).toLong())
-            val imgFirstBuf = ByteArray(4)
-            raf.readFully(imgFirstBuf)
+            channel.position((record0Offset + 16 + 108).toLong())
+            val imgFirstBuf = readBytes(channel, 4)
             val imageFirst = bufToInt(imgFirstBuf)
 
             if (imageFirst < 1 || imageFirst >= recordOffsets.size) return -1
@@ -264,34 +244,31 @@ class MobiContainerReader(
 
     /**
      * 从指定起始位置扫描 PDB 记录，通过 magic bytes 识别图片。
-     * 连续遇到非图片记录时停止扫描。
      */
     private fun scanForImageRecords(
-        raf: RandomAccessFile,
+        channel: FileChannel,
         recordOffsets: List<Int>,
         fileLength: Int,
         startIndex: Int,
     ): List<MobiImageEntry> {
         val entries = mutableListOf<MobiImageEntry>()
         var consecutiveNonImages = 0
-        val maxConsecutiveNonImages = 5 // stop after 5 consecutive non-image records
+        val maxConsecutiveNonImages = 5
 
         for (i in startIndex until recordOffsets.size) {
             val start = recordOffsets[i]
             val end = if (i + 1 < recordOffsets.size) recordOffsets[i + 1] else fileLength
             val size = end - start
-            if (size < 12) { // need at least 12 bytes for reliable magic detection
+            if (size < 12) {
                 consecutiveNonImages++
                 if (consecutiveNonImages >= maxConsecutiveNonImages && entries.isNotEmpty()) break
                 continue
             }
 
-            raf.seek(start.toLong())
-            val magic = ByteArray(12) // read 12 bytes for RIFF....WEBP detection
-            val readLen = minOf(magic.size, size)
-            raf.read(magic, 0, readLen)
+            channel.position(start.toLong())
+            val magic = readBytes(channel, minOf(12, size))
 
-            val ext = detectImageExtension(magic, readLen)
+            val ext = detectImageExtension(magic, magic.size)
             if (ext != null) {
                 entries.add(MobiImageEntry("image_${entries.size}.$ext", start, size))
                 consecutiveNonImages = 0
@@ -301,6 +278,31 @@ class MobiContainerReader(
             }
         }
         return entries
+    }
+
+    // ── Channel helpers ──────────────────────────────────────────────
+
+    private fun readBytes(channel: ReadableByteChannel, count: Int): ByteArray {
+        val buf = ByteBuffer.allocate(count)
+        var totalRead = 0
+        while (totalRead < count) {
+            val n = channel.read(buf)
+            if (n == -1) break
+            totalRead += n
+        }
+        buf.flip()
+        val bytes = ByteArray(buf.remaining())
+        buf.get(bytes)
+        return bytes
+    }
+
+    private fun FileChannel.readFully(buf: ByteBuffer) {
+        var totalRead = 0
+        while (totalRead < buf.capacity()) {
+            val n = this.read(buf)
+            if (n == -1) throw java.io.EOFException("Unexpected end of file")
+            totalRead += n
+        }
     }
 
     private fun bufToInt(buf: ByteArray): Int {
