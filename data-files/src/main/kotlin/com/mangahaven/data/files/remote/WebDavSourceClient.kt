@@ -121,11 +121,11 @@ class WebDavSourceClient(
             val builder = factory.newDocumentBuilder()
             val doc = builder.parse(xmlContent.byteInputStream())
             
-            val responses: org.w3c.dom.NodeList = doc.getElementsByTagNameNS("*", "response")
+            val responses: org.w3c.dom.NodeList = getElementsByLocalName(doc, "response")
             
             for (i in 0 until responses.length) {
                 val responseNode = responses.item(i) as org.w3c.dom.Element
-                val hrefNode = responseNode.getElementsByTagNameNS("*", "href").item(0)
+                val hrefNode = getElementsByLocalName(responseNode, "href").item(0)
                 val href = hrefNode?.textContent?.trim() ?: continue
                 
                 val normalizedHref = href.trimEnd('/')
@@ -138,32 +138,32 @@ class WebDavSourceClient(
                     if (responses.length > 1) continue
                 }
 
-                val propstats = responseNode.getElementsByTagNameNS("*", "propstat")
+                val propstats = getElementsByLocalName(responseNode, "propstat")
                 var propNode: org.w3c.dom.Element? = null
 
                 for (j in 0 until propstats.length) {
                     val propstatNode = propstats.item(j) as org.w3c.dom.Element
-                    val statusNode = propstatNode.getElementsByTagNameNS("*", "status").item(0)
+                    val statusNode = getElementsByLocalName(propstatNode, "status").item(0)
                     val status = statusNode?.textContent ?: ""
                     if (status.contains("200")) {
-                        propNode = propstatNode.getElementsByTagNameNS("*", "prop").item(0) as? org.w3c.dom.Element
+                        propNode = getElementsByLocalName(propstatNode, "prop").item(0) as? org.w3c.dom.Element
                         break
                     }
                 }
 
                 if (propNode == null && propstats.length > 0) {
                     val propstatNode = propstats.item(0) as org.w3c.dom.Element
-                    propNode = propstatNode.getElementsByTagNameNS("*", "prop").item(0) as? org.w3c.dom.Element
+                    propNode = getElementsByLocalName(propstatNode, "prop").item(0) as? org.w3c.dom.Element
                 }
                 
                 if (propNode != null) {
                     // Check for collection tag inside resourcetype or anywhere in prop
-                    val isDir = propNode.getElementsByTagNameNS("*", "collection").length > 0 || normalizedHref.endsWith("/")
+                    val isDir = getElementsByLocalName(propNode, "collection").length > 0 || normalizedHref.endsWith("/")
                     
-                    val contentLengthNode = propNode.getElementsByTagNameNS("*", "getcontentlength").item(0)
+                    val contentLengthNode = getElementsByLocalName(propNode, "getcontentlength").item(0)
                     val sizeBytes = contentLengthNode?.textContent?.toLongOrNull() ?: 0L
                     
-                    val lastModifiedNode = propNode.getElementsByTagNameNS("*", "getlastmodified").item(0)
+                    val lastModifiedNode = getElementsByLocalName(propNode, "getlastmodified").item(0)
                     var lastModified: Long? = null
 
                     if (lastModifiedNode != null && !lastModifiedNode.textContent.isNullOrBlank()) {
@@ -208,5 +208,31 @@ class WebDavSourceClient(
             throw java.io.IOException("Failed to parse WebDAV XML", e)
         }
         return entries
+    }
+
+    private fun getElementsByLocalName(doc: org.w3c.dom.Document, localName: String): org.w3c.dom.NodeList {
+        var nodes = doc.getElementsByTagNameNS("*", localName)
+        if (nodes.length > 0) return nodes
+
+        nodes = doc.getElementsByTagName(localName)
+        if (nodes.length > 0) return nodes
+
+        nodes = doc.getElementsByTagName("d:$localName")
+        if (nodes.length > 0) return nodes
+
+        return doc.getElementsByTagName("D:$localName")
+    }
+
+    private fun getElementsByLocalName(element: org.w3c.dom.Element, localName: String): org.w3c.dom.NodeList {
+        var nodes = element.getElementsByTagNameNS("*", localName)
+        if (nodes.length > 0) return nodes
+
+        nodes = element.getElementsByTagName(localName)
+        if (nodes.length > 0) return nodes
+
+        nodes = element.getElementsByTagName("d:$localName")
+        if (nodes.length > 0) return nodes
+
+        return element.getElementsByTagName("D:$localName")
     }
 }
