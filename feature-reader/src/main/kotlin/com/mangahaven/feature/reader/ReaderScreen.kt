@@ -685,8 +685,6 @@ private fun ContinuousVerticalReader(
                 translationY = offsetY
             ),
         horizontalAlignment = Alignment.CenterHorizontally,
-        // 预加载前后各 2 页以实现平滑滚动
-        beyondBoundsItemCount = 2,
     ) {
         items(
             count = totalPages,
