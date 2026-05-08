@@ -17,26 +17,6 @@ import java.io.IOException
 import java.io.StringReader
 
 /**
- * 包装 OkHttp Response 的 InputStream，关闭流时同时关闭底层 Response，避免连接泄漏。
- */
-private class ResponseClosingInputStream(
-    private val delegate: InputStream,
-    private val response: Response,
-) : InputStream() {
-    override fun read(): Int = delegate.read()
-    override fun read(b: ByteArray): Int = delegate.read(b)
-    override fun read(b: ByteArray, off: Int, len: Int): Int = delegate.read(b, off, len)
-    override fun available(): Int = delegate.available()
-    override fun close() {
-        try { delegate.close() } finally { response.close() }
-    }
-    override fun mark(readlimit: Int) = delegate.mark(readlimit)
-    override fun reset() = delegate.reset()
-    override fun markSupported(): Boolean = delegate.markSupported()
-    override fun skip(n: Long): Long = delegate.skip(n)
-}
-
-/**
  * OPDS 协议的内容源客户端。
  * 满足不给设备带来存储负担的要求，OPDS 源是纯动态的，我们仅请求并解析 XML 获取书目，
  * 不将源下载至本地，除非用户实际打开页面，符合 "Library Management" Phase 4/Phase 0 强化要求。
