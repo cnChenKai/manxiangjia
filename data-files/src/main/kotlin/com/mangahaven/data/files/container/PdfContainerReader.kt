@@ -40,7 +40,7 @@ class PdfContainerReader(
                         pages.add(
                             PageRef(
                                 index = i,
-                                name = "page_\${i}.png",
+                                name = "page_${i}.png",
                                 path = i.toString(), // We use the path field as the page index for PDF
                                 mimeType = "image/png",
                                 sizeBytes = null
@@ -51,7 +51,7 @@ class PdfContainerReader(
                     pages
                 }
             } catch (e: Exception) {
-                Timber.e(e, "Failed to list pages in PDF: \${target.path}")
+                Timber.e(e, "Failed to list pages in PDF: ${target.path}")
                 emptyList()
             }
         }
@@ -100,7 +100,7 @@ class PdfContainerReader(
                 val uri = Uri.parse(target.path)
                 openPageFromPdf(uri, 0)
             } catch (e: Exception) {
-                Timber.e(e, "Failed to extract cover from PDF: \${target.path}")
+                Timber.e(e, "Failed to extract cover from PDF: ${target.path}")
                 null
             }
         }

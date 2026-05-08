@@ -88,7 +88,9 @@ class WebDavSourceClient(
             throw IllegalStateException("Failed to GET WebDAV stream: ${response.code}")
         }
         
-        response.body?.byteStream() ?: throw IllegalStateException("Empty WebDAV body")
+        val body = response.body ?: run { response.close(); throw IllegalStateException("Empty WebDAV body") }
+        // 包装流，关闭时自动释放 Response 连接
+        ResponseClosingInputStream(body.byteStream(), response)
     }
 
     override suspend fun exists(path: String): Boolean {

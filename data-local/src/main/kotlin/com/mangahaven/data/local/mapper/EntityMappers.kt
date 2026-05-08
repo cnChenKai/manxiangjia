@@ -16,6 +16,7 @@ fun Source.toEntity(): SourceEntity = SourceEntity(
     authRef = authRef,
     isWritable = isWritable,
     lastSyncAt = lastSyncAt,
+    isVirtual = isVirtual,
 )
 
 fun SourceEntity.toModel(): Source = Source(
@@ -26,6 +27,7 @@ fun SourceEntity.toModel(): Source = Source(
     authRef = authRef,
     isWritable = isWritable,
     lastSyncAt = lastSyncAt,
+    isVirtual = isVirtual,
 )
 
 /**

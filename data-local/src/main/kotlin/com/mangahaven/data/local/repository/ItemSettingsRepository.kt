@@ -6,6 +6,7 @@ import com.mangahaven.data.local.entity.ItemSettingsEntity
 import com.mangahaven.model.ItemReaderSettingsOverride
 import com.mangahaven.model.ReadingMode
 import com.mangahaven.model.ReaderSettings
+import com.mangahaven.model.TapZoneProfile
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -68,6 +69,7 @@ class ItemSettingsRepository @Inject constructor(
                 volumeKeysPaging = override?.volumeKeysPaging ?: global.volumeKeysPaging,
                 enablePreload = global.enablePreload,
                 isOverridden = override != null,
+                tapZoneProfile = global.tapZoneProfile,
             )
         }
     }
@@ -111,4 +113,5 @@ data class ResolvedReaderSettings(
     val keepScreenOn: Boolean,
     val enablePreload: Boolean,
     val isOverridden: Boolean,
+    val tapZoneProfile: TapZoneProfile = TapZoneProfile.DEFAULT,
 )

@@ -16,8 +16,10 @@ import java.io.IOException
 
 object CrashUploader {
 
+    // 开发/测试用占位值，正式发布前应替换为实际的崩溃上报服务地址
     private const val UPLOAD_URL = "https://0x0.st"
-    private const val EMAIL_ADDRESS = "yxxck@live.com"
+    // 开发/测试用占位邮箱，正式发布前应替换为真实的客服邮箱
+    private const val EMAIL_ADDRESS = "dev@example.com"
 
     suspend fun uploadLogFile(context: Context, logFile: File): Result<String> = withContext(Dispatchers.IO) {
         if (!logFile.exists()) {

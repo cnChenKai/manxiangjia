@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -153,6 +154,11 @@ fun SettingsScreen(
             )
             HorizontalDivider()
 
+            SettingsCategoryTitle(title = "书库统计")
+            val stats by viewModel.libraryStats.collectAsStateWithLifecycle()
+            LibraryStatsSection(stats = stats, onRefresh = viewModel::refreshStats)
+            HorizontalDivider()
+
             SettingsCategoryTitle(title = "数据与存储")
             SettingsClickableItem(
                 title = "清理图片缓存",
@@ -271,6 +277,72 @@ fun SettingsClickableItem(
         Text(
             text = subtitle,
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+/**
+ * 书库统计卡片。
+ * 显示条目总数、阅读状态分布等信息。
+ */
+@Composable
+fun LibraryStatsSection(stats: LibraryStats, onRefresh: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        // 总数
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "总条目数",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Text(
+                text = "${stats.totalItems}",
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 阅读状态分布
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            StatBadge(label = "未读", count = stats.unreadCount, color = MaterialTheme.colorScheme.error)
+            StatBadge(label = "阅读中", count = stats.readingCount, color = MaterialTheme.colorScheme.tertiary)
+            StatBadge(label = "已读", count = stats.completedCount, color = MaterialTheme.colorScheme.primary)
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+
+        // 刷新按钮
+        TextButton(
+            onClick = onRefresh,
+            modifier = Modifier.align(Alignment.End)
+        ) {
+            Text("刷新统计")
+        }
+    }
+}
+
+@Composable
+private fun StatBadge(label: String, count: Int, color: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = "$count",
+            style = MaterialTheme.typography.headlineSmall,
+            color = color
+        )
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

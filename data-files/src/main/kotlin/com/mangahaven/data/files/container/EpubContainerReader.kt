@@ -38,7 +38,8 @@ class EpubContainerReader(
                         while (entry != null) {
                             if (!entry.isDirectory &&
                                 ImageFileUtils.isImageFile(entry.name) &&
-                                !ImageFileUtils.shouldIgnore(entry.name)
+                                !ImageFileUtils.shouldIgnore(entry.name) &&
+                                !entry.name.contains("..")
                             ) {
                                 entries.add(
                                     ZipEntryInfo(

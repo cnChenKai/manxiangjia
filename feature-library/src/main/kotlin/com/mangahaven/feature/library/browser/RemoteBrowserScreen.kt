@@ -75,7 +75,7 @@ fun RemoteBrowserScreen(
                                 leadingContent = { Icon(Icons.Default.Folder, contentDescription = null) },
                                 modifier = Modifier.clickable { viewModel.navigateUp() }
                             )
-                            Divider()
+                            HorizontalDivider()
                         }
                     }
 
@@ -93,7 +93,7 @@ fun RemoteBrowserScreen(
                                 }
                             }
                         )
-                        Divider()
+                        HorizontalDivider()
                     }
                 }
             }

@@ -97,6 +97,21 @@ class LibraryRepository @Inject constructor(
      */
     suspend fun count(): Int = libraryItemDao.count()
 
+    /**
+     * 按阅读状态统计数量。
+     */
+    suspend fun countByStatus(status: String): Int = libraryItemDao.countByStatus(status)
+
+    /**
+     * 收藏条目数量。
+     */
+    suspend fun countFavorites(): Int = libraryItemDao.countFavorites()
+
+    /**
+     * 远程源条目数量。
+     */
+    suspend fun countRemoteItems(): Int = libraryItemDao.countRemoteItems()
+
     // --- Source 操作 ---
 
     /**

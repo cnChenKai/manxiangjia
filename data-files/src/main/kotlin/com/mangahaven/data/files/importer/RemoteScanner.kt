@@ -55,8 +55,9 @@ class RemoteScanner @Inject constructor(
                         addedCount += scanDirectory(source, sourceClient, entry.path, onProgress)
                     }
                 } else if (ImageFileUtils.isArchive(entry.name)) {
-                    // 对于远程的 ZIP/CBZ 压缩包，当前 MVP (Phase 3) 也勉强算 REMOTE_ENTRY
-                    // TODO: 等待下载缓存支持
+                    // 远程 ZIP/CBZ/RAR 压缩包：添加为 REMOTE_ENTRY
+                    // PageProviderFactory 会根据文件扩展名自动选择
+                    // RemoteArchivePageProvider（下载缓存后读取）
                     if (addRemoteEntry(source, entry)) {
                         addedCount++
                     }
