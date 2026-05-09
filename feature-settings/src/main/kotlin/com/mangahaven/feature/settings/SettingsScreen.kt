@@ -21,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mangahaven.data.files.remote.CrashUploader
 import com.mangahaven.model.ReadingMode
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.io.File
 import java.text.SimpleDateFormat
@@ -179,22 +180,30 @@ fun SettingsScreen(
             
 
             SettingsCategoryTitle(title = "开发者选项")
+            val coroutineScope = rememberCoroutineScope()
             SettingsClickableItem(
                 title = "导出运行日志",
                 subtitle = "将本地日志文件导出分享以用于排错",
                 onClick = {
-                    try {
-                        // Find latest log file
-                        val logsDir = File(context.filesDir, "logs")
-                        val latestLog = logsDir.listFiles()?.maxByOrNull { it.lastModified() }
+                    coroutineScope.launch(Dispatchers.IO) {
+                        try {
+                            val logsDir = File(context.filesDir, "logs")
+                            val latestLog = logsDir.listFiles()?.maxByOrNull { it.lastModified() }
 
-                        if (latestLog != null && latestLog.exists()) {
-                            CrashUploader.exportLogFile(context, latestLog)
-                        } else {
-                            Toast.makeText(context, "没有找到本地日志文件", Toast.LENGTH_SHORT).show()
+                            if (latestLog != null && latestLog.exists()) {
+                                launch(Dispatchers.Main) {
+                                    CrashUploader.exportLogFile(context, latestLog)
+                                }
+                            } else {
+                                launch(Dispatchers.Main) {
+                                    Toast.makeText(context, "没有找到本地日志文件", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        } catch (e: Exception) {
+                            launch(Dispatchers.Main) {
+                                Toast.makeText(context, "导出出错", Toast.LENGTH_SHORT).show()
+                            }
                         }
-                    } catch (e: Exception) {
-                        Toast.makeText(context, "导出出错", Toast.LENGTH_SHORT).show()
                     }
                 }
             )

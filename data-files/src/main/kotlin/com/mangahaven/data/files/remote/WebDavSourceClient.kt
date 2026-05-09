@@ -52,14 +52,19 @@ class WebDavSourceClient(
             if (!response.isSuccessful) {
                 throw java.io.IOException("WebDAV list failed: ${response.code} ${response.message}")
             }
-            
-            parsePropfindResponse(response.body?.string() ?: "", path)
+
+            val body = response.body?.string() ?: ""
+            if (body.isNotBlank() && !body.trimStart().startsWith("<")) {
+                Timber.e("WebDAV response is not XML: ${body.take(500)}")
+                throw java.io.IOException("WebDAV server returned non-XML response (possibly HTML error page)")
+            }
+            parsePropfindResponse(body, path)
         }
     }
 
     override suspend fun stat(path: String): SourceEntry? = withContext(Dispatchers.IO) {
         val url = buildUrl(path)
-        
+
         // WebDAV PROPFIND，Depth = 0 查询自己
         val request = Request.Builder()
             .url(url)
@@ -67,7 +72,7 @@ class WebDavSourceClient(
             .header("Depth", "0")
             .addAuth()
             .build()
-            
+
         httpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) throw java.io.IOException("WebDAV stat failed: ${response.code} ${response.message}")
             parsePropfindResponse(response.body?.string() ?: "", path).firstOrNull()
@@ -85,10 +90,10 @@ class WebDavSourceClient(
         val response = httpClient.newCall(request).execute()
         if (!response.isSuccessful) {
             response.close()
-            throw IllegalStateException("Failed to GET WebDAV stream: ${response.code}")
+            throw java.io.IOException("WebDAV GET failed: ${response.code} ${response.message}")
         }
-        
-        val body = response.body ?: run { response.close(); throw IllegalStateException("Empty WebDAV body") }
+
+        val body = response.body ?: run { response.close(); throw java.io.IOException("WebDAV GET returned empty body") }
         // 包装流，关闭时自动释放 Response 连接
         ResponseClosingInputStream(body.byteStream(), response)
     }
@@ -108,6 +113,8 @@ class WebDavSourceClient(
         if (xmlContent.isEmpty()) return entries
 
         try {
+            // 去除 UTF-8 BOM 和前后空白，防止 XML 解析器报错
+            val cleanXml = xmlContent.trimStart('\uFEFF', '\uFFFE', ' ', '\t', '\n', '\r')
             val factory = DocumentBuilderFactory.newInstance()
             // XXE Security Fix: Disable DTDs and external entities
             factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
@@ -119,7 +126,7 @@ class WebDavSourceClient(
 
             factory.isNamespaceAware = true
             val builder = factory.newDocumentBuilder()
-            val doc = builder.parse(xmlContent.byteInputStream())
+            val doc = builder.parse(cleanXml.byteInputStream())
             
             val responses: org.w3c.dom.NodeList = getElementsByLocalName(doc, "response")
             
@@ -204,8 +211,8 @@ class WebDavSourceClient(
                 }
             }
         } catch (e: Exception) {
-            Timber.e(e, "Failed to parse WebDAV XML. Content was: \n$xmlContent")
-            throw java.io.IOException("Failed to parse WebDAV XML", e)
+            Timber.e(e, "Failed to parse WebDAV XML. Content was: \n${xmlContent.take(2000)}")
+            throw java.io.IOException("Failed to parse WebDAV XML: ${e.message}", e)
         }
         return entries
     }

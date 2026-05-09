@@ -22,7 +22,12 @@ object CrashUploader {
             // or use standard ContentProvider approach.
             // For simplicity in this early stage, let's just append the content if it's not huge.
             try {
-                val content = logFile.readText().take(50000) // limit to 50k chars
+                val fullContent = logFile.readText()
+                val content = if (fullContent.length > 50000) {
+                    fullContent.take(50000) + "\n\n[truncated — full log is ${fullContent.length} chars]"
+                } else {
+                    fullContent
+                }
                 putExtra(Intent.EXTRA_TEXT, "Log content:\n\n$content")
             } catch (e: Exception) {
                 Timber.e(e, "Failed to read log file for email")

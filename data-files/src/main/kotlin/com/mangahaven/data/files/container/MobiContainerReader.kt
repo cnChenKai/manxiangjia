@@ -81,6 +81,9 @@ class MobiContainerReader(
                 throw IndexOutOfBoundsException("Page index $pageIndex out of range [0, ${entries.size})")
             }
             val entry = entries[pageIndex]
+            if (entry.size <= 0 || entry.size > MAX_PAGE_SIZE_BYTES) {
+                throw IllegalStateException("MOBI page size out of range: ${entry.size} bytes")
+            }
 
             val pfd = context.contentResolver.openFileDescriptor(mobiUri, "r")
                 ?: throw IllegalStateException("Cannot open MOBI file: $mobiUri")
@@ -111,6 +114,10 @@ class MobiContainerReader(
                     // Fallback to first image; MOBI cover metadata (EXTH) parsing
                     // would be needed for precise cover extraction.
                     val cover = entries.first()
+                    if (cover.size <= 0 || cover.size > MAX_PAGE_SIZE_BYTES) {
+                        Timber.w("MOBI cover size out of range: ${cover.size} bytes")
+                        return@withContext null
+                    }
                     val pfd = context.contentResolver.openFileDescriptor(uri, "r")
                         ?: return@withContext null
                     pfd.use { fd ->
@@ -136,15 +143,13 @@ class MobiContainerReader(
      * 获取或加载 MOBI 索引缓存。
      */
     private fun getOrLoadIndex(uri: Uri, uriStr: String): List<MobiImageEntry> {
-        indexCache[uriStr]?.let { return it }
-
-        val pfd = context.contentResolver.openFileDescriptor(uri, "r")
-            ?: throw IllegalStateException("Cannot open MOBI file: $uri")
-        pfd.use { fd ->
-            java.io.FileInputStream(fd.fileDescriptor).channel.use { channel ->
-                val entries = parseMobiImages(channel)
-                indexCache[uriStr] = entries
-                return entries
+        return indexCache.computeIfAbsent(uriStr) {
+            val pfd = context.contentResolver.openFileDescriptor(uri, "r")
+                ?: throw IllegalStateException("Cannot open MOBI file: $uri")
+            pfd.use { fd ->
+                java.io.FileInputStream(fd.fileDescriptor).channel.use { channel ->
+                    parseMobiImages(channel)
+                }
             }
         }
     }
@@ -179,8 +184,13 @@ class MobiContainerReader(
      * 但不依赖不可靠的 imageCount 字段。
      */
     private fun parseMobiImages(channel: FileChannel): List<MobiImageEntry> {
-        val fileLength = channel.size().toInt()
-        if (fileLength < 78) return emptyList()
+        val fileSize = channel.size()
+        if (fileSize < 78) return emptyList()
+        if (fileSize > Int.MAX_VALUE) {
+            Timber.w("MOBI file too large for Int-based parsing: $fileSize bytes")
+            return emptyList()
+        }
+        val fileLength = fileSize.toInt()
 
         // ── PDB Header ──
         channel.position(0)
@@ -313,6 +323,9 @@ class MobiContainerReader(
     }
 
     companion object {
+        /** 单页最大允许分配内存（50MB），防止畸形文件触发 OOM */
+        private const val MAX_PAGE_SIZE_BYTES = 50 * 1024 * 1024
+
         /**
          * 通过 magic bytes 检测图片格式，返回文件扩展名或 null。
          * 需要至少 12 字节的 buffer 以正确识别 WebP (RIFF....WEBP)。

@@ -9,6 +9,8 @@ import com.mangahaven.model.ContainerTarget
 import com.mangahaven.model.LibraryItemType
 import com.mangahaven.model.PageRef
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.io.InputStream
@@ -23,11 +25,13 @@ class LocalPageProvider(
 ) : PageProvider {
 
     private var pages: List<PageRef>? = null
+    private val pagesMutex = Mutex()
     private val folderReader by lazy { FolderContainerReader(context) }
     private val archiveReader by lazy { ArchiveContainerReader(context) }
     private val rarReader by lazy { com.mangahaven.data.files.container.RarArchiveContainerReader(context) }
     private val epubReader by lazy { com.mangahaven.data.files.container.EpubContainerReader(context) }
     private val mobiReader by lazy { com.mangahaven.data.files.container.MobiContainerReader(context) }
+    private val pdfReader by lazy { com.mangahaven.data.files.container.PdfContainerReader(context) }
 
     private fun isRarArchive(path: String): Boolean {
         val lowerPath = path.lowercase()
@@ -38,22 +42,27 @@ class LocalPageProvider(
      * 初始化页面列表（懒加载）。
      */
     private suspend fun ensurePages(): List<PageRef> {
-        return pages ?: run {
-            val loadedPages = when (containerTarget.itemType) {
-                LibraryItemType.FOLDER -> folderReader.listPages(containerTarget)
-                LibraryItemType.ARCHIVE, LibraryItemType.PDF -> {
-                    if (isRarArchive(containerTarget.path)) {
-                        rarReader.listPages(containerTarget)
-                    } else {
-                        archiveReader.listPages(containerTarget)
+        pages?.let { return it }
+        return pagesMutex.withLock {
+            // 双重检查：拿到锁后再检查一次
+            pages ?: run {
+                val loadedPages = when (containerTarget.itemType) {
+                    LibraryItemType.FOLDER -> folderReader.listPages(containerTarget)
+                    LibraryItemType.ARCHIVE -> {
+                        if (isRarArchive(containerTarget.path)) {
+                            rarReader.listPages(containerTarget)
+                        } else {
+                            archiveReader.listPages(containerTarget)
+                        }
                     }
+                    LibraryItemType.PDF -> pdfReader.listPages(containerTarget)
+                    LibraryItemType.EPUB -> epubReader.listPages(containerTarget)
+                    LibraryItemType.MOBI -> mobiReader.listPages(containerTarget)
+                    else -> emptyList()
                 }
-                LibraryItemType.EPUB -> epubReader.listPages(containerTarget)
-                LibraryItemType.MOBI -> mobiReader.listPages(containerTarget)
-                else -> emptyList()
+                pages = loadedPages
+                loadedPages
             }
-            pages = loadedPages
-            loadedPages
         }
     }
 
@@ -69,13 +78,17 @@ class LocalPageProvider(
 
             when (containerTarget.itemType) {
                 LibraryItemType.FOLDER -> folderReader.openPage(pageRef)
-                LibraryItemType.ARCHIVE, LibraryItemType.PDF -> {
+                LibraryItemType.ARCHIVE -> {
                     val archiveUri = Uri.parse(containerTarget.path)
                     if (isRarArchive(containerTarget.path)) {
                         rarReader.openPageFromArchive(archiveUri, pageRef.path)
                     } else {
                         archiveReader.openPageFromArchive(archiveUri, pageRef.path)
                     }
+                }
+                LibraryItemType.PDF -> {
+                    val pdfUri = Uri.parse(containerTarget.path)
+                    pdfReader.openPageFromPdf(pdfUri, pageRef.index)
                 }
                 LibraryItemType.EPUB -> {
                     val epubUri = Uri.parse(containerTarget.path)
