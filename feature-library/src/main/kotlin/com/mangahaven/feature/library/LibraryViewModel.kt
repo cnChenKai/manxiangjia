@@ -94,16 +94,22 @@ class LibraryViewModel @Inject constructor(
     fun importFile(uri: Uri) {
         viewModelScope.launch {
             _isImporting.value = true
-            safImporter.importFile(uri)
-            _isImporting.value = false
+            try {
+                safImporter.importFile(uri)
+            } finally {
+                _isImporting.value = false
+            }
         }
     }
 
     fun importDirectory(uri: Uri) {
         viewModelScope.launch {
             _isImporting.value = true
-            safImporter.importDirectory(uri)
-            _isImporting.value = false
+            try {
+                safImporter.importDirectory(uri)
+            } finally {
+                _isImporting.value = false
+            }
         }
     }
 

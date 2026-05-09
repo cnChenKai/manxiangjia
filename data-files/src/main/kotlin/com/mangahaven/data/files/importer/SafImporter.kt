@@ -64,14 +64,14 @@ class SafImporter @Inject constructor(
             val scanResult = fileScanner.scanSingleFile(fileUri) ?: return@withContext null
             val item = createLibraryItem(scanResult)
 
-            // 提取封面
-            extractAndSaveCover(item, scanResult)
+            // 提取封面（返回带有 coverPath 的副本）
+            val itemWithCover = extractAndSaveCover(item, scanResult)
 
             // 保存到数据库
-            libraryRepository.addItem(item)
+            libraryRepository.addItem(itemWithCover)
 
-            Timber.i("Successfully imported file: ${item.title}")
-            item
+            Timber.i("Successfully imported file: ${itemWithCover.title}")
+            itemWithCover
         } catch (e: Exception) {
             Timber.e(e, "Failed to import file: $fileUri")
             null
@@ -97,11 +97,14 @@ class SafImporter @Inject constructor(
                     return@withContext emptyList()
                 }
 
-                val items = scanResults.map { result ->
-                    val item = createLibraryItem(result)
-                    // 提取封面
-                    extractAndSaveCover(item, result)
-                    item
+                val items = scanResults.mapNotNull { result ->
+                    try {
+                        val item = createLibraryItem(result)
+                        extractAndSaveCover(item, result)
+                    } catch (e: Exception) {
+                        Timber.e(e, "Failed to import item: ${result.title}")
+                        null
+                    }
                 }
 
                 // 批量保存到数据库
@@ -173,6 +176,7 @@ class SafImporter @Inject constructor(
             }
             LibraryItemType.EPUB -> EpubContainerReader(context).extractCover(target)
             LibraryItemType.MOBI -> MobiContainerReader(context).extractCover(target)
+            LibraryItemType.PDF -> com.mangahaven.data.files.container.PdfContainerReader(context).extractCover(target)
             else -> null
         }
 

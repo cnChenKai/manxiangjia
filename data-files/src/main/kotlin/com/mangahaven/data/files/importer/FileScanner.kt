@@ -35,6 +35,7 @@ class FileScanner @Inject constructor(
         private val RAR_EXTENSIONS = setOf("rar", "cbr")
         private val EBOOK_EXTENSIONS = setOf("epub")
         private val MOBI_EXTENSIONS = setOf("mobi", "prc")
+        private val PDF_EXTENSIONS = setOf("pdf")
 
         private val ARCHIVE_MIME_TYPES = setOf(
             "application/zip",
@@ -56,6 +57,10 @@ class FileScanner @Inject constructor(
         private val MOBI_MIME_TYPES = setOf(
             "application/x-mobipocket-ebook",
             "application/x-mobi",
+        )
+
+        private val PDF_MIME_TYPES = setOf(
+            "application/pdf",
         )
     }
 
@@ -143,6 +148,18 @@ class FileScanner @Inject constructor(
                             )
                         )
                     }
+                    // PDF
+                    child.isFile && isPdfFile(name, child.type) -> {
+                        val title = name ?: child.uri.lastPathSegment ?: "未命名 PDF"
+                        results.add(
+                            ScanResult(
+                                title = title.substringBeforeLast('.'),
+                                path = child.uri.toString(),
+                                itemType = LibraryItemType.PDF,
+                                pageCount = null,
+                            )
+                        )
+                    }
                     // 压缩包 (ZIP/CBZ)
                     child.isFile && isArchiveFile(name, child.type) -> {
                         val title = name ?: child.uri.lastPathSegment ?: "未命名漫画"
@@ -201,6 +218,12 @@ class FileScanner @Inject constructor(
                     itemType = LibraryItemType.MOBI,
                     pageCount = null,
                 )
+                isPdfFile(name, mimeType) -> ScanResult(
+                    title = title.substringBeforeLast('.'),
+                    path = fileUri.toString(),
+                    itemType = LibraryItemType.PDF,
+                    pageCount = null,
+                )
                 isArchiveFile(name, mimeType) -> ScanResult(
                     title = title.substringBeforeLast('.'),
                     path = fileUri.toString(),
@@ -253,5 +276,11 @@ class FileScanner @Inject constructor(
         val ext = name?.substringAfterLast('.', "")?.lowercase()
         if (ext in MOBI_EXTENSIONS) return true
         return mimeType in MOBI_MIME_TYPES
+    }
+
+    private fun isPdfFile(name: String?, mimeType: String?): Boolean {
+        val ext = name?.substringAfterLast('.', "")?.lowercase()
+        if (ext in PDF_EXTENSIONS) return true
+        return mimeType in PDF_MIME_TYPES
     }
 }
