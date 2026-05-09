@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.mangahaven.data.files.container.ArchiveContainerReader
+import com.mangahaven.data.files.container.EpubContainerReader
 import com.mangahaven.data.files.container.FolderContainerReader
+import com.mangahaven.data.files.container.MobiContainerReader
 import com.mangahaven.data.local.cover.CoverManager
 import com.mangahaven.data.local.repository.LibraryRepository
 import com.mangahaven.model.*
@@ -169,6 +171,8 @@ class SafImporter @Inject constructor(
                     ArchiveContainerReader(context).extractCover(target)
                 }
             }
+            LibraryItemType.EPUB -> EpubContainerReader(context).extractCover(target)
+            LibraryItemType.MOBI -> MobiContainerReader(context).extractCover(target)
             else -> null
         }
 
