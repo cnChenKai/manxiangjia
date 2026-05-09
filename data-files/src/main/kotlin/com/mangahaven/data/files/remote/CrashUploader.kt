@@ -1,6 +1,5 @@
 package com.mangahaven.data.files.remote
 
-import android.content.Context
 import android.content.Intent
 import timber.log.Timber
 import java.io.File
@@ -48,17 +47,4 @@ object CrashUploader {
         }
     }
 
-    /**
-     * 启动分享日志的 Intent。应在主线程调用。
-     */
-    fun launchExport(context: Context, logFile: File) {
-        try {
-            val intent = buildLogIntent(logFile)
-            context.startActivity(Intent.createChooser(intent, "Export Log").apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-            })
-        } catch (e: Exception) {
-            Timber.e(e, "Failed to start export intent")
-        }
-    }
 }
